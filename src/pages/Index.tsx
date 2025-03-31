@@ -1,8 +1,8 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
-import { Cpu, Save, Download, Play, LogOut } from "lucide-react";
+import { Cpu, Save, Download, Play, LogOut, FolderOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ReactFlowProvider } from "reactflow";
 import FlowSidebar from "@/components/sidebar/FlowSidebar";
@@ -13,6 +13,7 @@ import MetricsDashboardView from "@/components/views/MetricsDashboardView";
 import FeedbackAnalysisView from "@/components/views/FeedbackAnalysisView";
 import LogsView from "@/components/views/LogsView";
 import SaveFlowDialog from "@/components/SaveFlowDialog";
+import LoadFlowDialog from "@/components/LoadFlowDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -28,6 +29,7 @@ const Index = () => {
   const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
   const [activeTab, setActiveTab] = useState("flow");
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [flowConfigurations, setFlowConfigurations] = useState([]);
   const { toast } = useToast();
@@ -75,6 +77,13 @@ const Index = () => {
     }
   }, [user, toast]);
 
+  // Load flow configurations on component mount if user is logged in
+  useEffect(() => {
+    if (user) {
+      fetchFlowConfigurations();
+    }
+  }, [user, fetchFlowConfigurations]);
+
   const saveFlow = useCallback(async (name, description) => {
     if (!user) {
       toast({
@@ -121,6 +130,29 @@ const Index = () => {
     }
   }, [user, flowData, toast, fetchFlowConfigurations]);
 
+  const loadFlow = useCallback((flowConfig) => {
+    try {
+      setFlowData({
+        nodes: flowConfig.nodes || [],
+        edges: flowConfig.edges || []
+      });
+      
+      setIsLoadDialogOpen(false);
+      
+      toast({
+        title: 'Flow loaded successfully',
+        description: `Flow "${flowConfig.name}" has been loaded`,
+      });
+    } catch (error) {
+      console.error('Error loading flow:', error);
+      toast({
+        title: 'Error loading flow',
+        description: 'There was a problem loading the selected flow',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="border-b border-gray-800 p-4 flex justify-between items-center">
@@ -138,6 +170,16 @@ const Index = () => {
           >
             <Save className="h-4 w-4" />
             Save
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white border-purple-500"
+            onClick={() => setIsLoadDialogOpen(true)}
+            disabled={isLoading || !user}
+          >
+            <FolderOpen className="h-4 w-4" />
+            Load
           </Button>
           <Button 
             variant="outline" 
@@ -286,6 +328,15 @@ const Index = () => {
         onSave={saveFlow}
         isLoading={isLoading}
         existingFlows={flowConfigurations}
+      />
+
+      <LoadFlowDialog
+        isOpen={isLoadDialogOpen}
+        onClose={() => setIsLoadDialogOpen(false)}
+        onLoad={loadFlow}
+        isLoading={isLoading}
+        flows={flowConfigurations}
+        fetchFlows={fetchFlowConfigurations}
       />
     </div>
   );
