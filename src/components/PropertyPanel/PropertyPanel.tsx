@@ -1,3 +1,4 @@
+
 import { memo } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,11 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
       case 'retriever':
       case 'contextManager':
       case 'feedback':
-        return <NodeDetails selectedNode={selectedNode} onUpdateNode={onUpdateNode} />;
+        return <NodeDetails 
+          node={selectedNode} 
+          onClose={onClose}
+          onMetricsUpdate={() => onUpdateNode(selectedNode.data)} 
+        />;
       case 'ranker':
         return (
           <RankerNodeProperties
@@ -39,7 +44,11 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
           />
         );
       default:
-        return <NodeDetails selectedNode={selectedNode} onUpdateNode={onUpdateNode} />;
+        return <NodeDetails 
+          node={selectedNode} 
+          onClose={onClose} 
+          onMetricsUpdate={() => onUpdateNode(selectedNode.data)}
+        />;
     }
   };
 

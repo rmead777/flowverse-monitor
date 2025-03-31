@@ -22,6 +22,10 @@ type AgentLogsType = {
 }
 
 const NodeDetails = ({ node, onClose, onMetricsUpdate }) => {
+  if (!node || !node.data) {
+    return null;
+  }
+
   const { data } = node;
   const [isUpdating, setIsUpdating] = useState(false);
   const [updatedData, setUpdatedData] = useState({
