@@ -1,5 +1,4 @@
-
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -17,12 +16,13 @@ import 'reactflow/dist/style.css';
 import { Button } from './ui/button';
 import CustomNode from './CustomNode';
 import NodeDetails from './NodeDetails';
-import { Save, Download, Upload, RotateCcw, Undo, Redo, Plus, Minus, Maximize, Loader } from 'lucide-react';
+import { Save, Download, Upload, RotateCcw, Undo, Redo, Plus, Minus, Maximize, Loader, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import SaveFlowDialog from './SaveFlowDialog';
 import { v4 as uuidv4 } from 'uuid';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 
 const initialNodes = [
   {
@@ -163,7 +163,6 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const reactFlowInstance = useReactFlow();
   const flowWrapper = useRef(null);
   
-  // Update flow when initialFlowData changes
   useEffect(() => {
     if (initialFlowData?.nodes?.length) {
       setNodes(initialFlowData.nodes);
@@ -456,7 +455,6 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     saveToUndoHistory();
     setNodes((nds) => [...nds, newNode]);
     
-    // Log the new node creation
     const logOperation = async () => {
       try {
         const { error } = await supabase
@@ -476,7 +474,91 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     logOperation();
   }, [setNodes, saveToUndoHistory]);
 
-  // Handle node drag from sidebar
+  const deleteSelectedNodes = useCallback(() => {
+    const selectedNodes = nodes.filter(node => node.selected);
+    
+    if (selectedNodes.length === 0) return;
+    
+    saveToUndoHistory();
+    
+    const nodeIdsToDelete = selectedNodes.map(node => node.id);
+    
+    setNodes(nodes => nodes.filter(node => !nodeIdsToDelete.includes(node.id)));
+    
+    setEdges(edges => edges.filter(edge => 
+      !nodeIdsToDelete.includes(edge.source) && !nodeIdsToDelete.includes(edge.target)
+    ));
+    
+    toast({
+      title: `${nodeIdsToDelete.length} node${nodeIdsToDelete.length > 1 ? 's' : ''} deleted`,
+      description: `Successfully removed ${nodeIdsToDelete.length} node${nodeIdsToDelete.length > 1 ? 's' : ''} from the flow`,
+    });
+    
+    const logDeletion = async () => {
+      try {
+        if (!user) return;
+        
+        await supabase
+          .from('agent_logs')
+          .insert(nodeIdsToDelete.map(nodeId => ({
+            agent_name: nodes.find(n => n.id === nodeId)?.data?.label || 'Unknown Node',
+            event_type: 'node_deleted',
+            details: { node_id: nodeId }
+          })));
+      } catch (err) {
+        console.error('Error logging node deletion:', err);
+      }
+    };
+    
+    logDeletion();
+  }, [nodes, setNodes, setEdges, saveToUndoHistory, toast, user]);
+
+  const deleteNode = useCallback((nodeId) => {
+    saveToUndoHistory();
+    
+    setNodes(nodes => nodes.filter(node => node.id !== nodeId));
+    
+    setEdges(edges => edges.filter(edge => 
+      edge.source !== nodeId && edge.target !== nodeId
+    ));
+    
+    toast({
+      title: "Node deleted",
+      description: "Successfully removed the node from the flow",
+    });
+    
+    const logDeletion = async () => {
+      try {
+        if (!user) return;
+        
+        const nodeName = nodes.find(n => n.id === nodeId)?.data?.label || 'Unknown Node';
+        
+        await supabase
+          .from('agent_logs')
+          .insert([{
+            agent_name: nodeName,
+            event_type: 'node_deleted',
+            details: { node_id: nodeId }
+          }]);
+      } catch (err) {
+        console.error('Error logging node deletion:', err);
+      }
+    };
+    
+    logDeletion();
+  }, [nodes, setNodes, setEdges, saveToUndoHistory, toast, user]);
+
+  const onKeyDown = useCallback((event: KeyboardEvent) => {
+    const activeElement = document.activeElement;
+    const isInput = activeElement.tagName === 'INPUT' || 
+                    activeElement.tagName === 'TEXTAREA' || 
+                    activeElement.isContentEditable;
+    
+    if (!isInput && (event.key === 'Delete' || event.key === 'Backspace')) {
+      deleteSelectedNodes();
+    }
+  }, [deleteSelectedNodes]);
+
   const onDragOver = useCallback((event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -502,7 +584,6 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
       saveToUndoHistory();
       setNodes((nds) => [...nds, newNode]);
 
-      // Log the new node creation from drag
       const logOperation = async () => {
         try {
           const { error } = await supabase
@@ -528,7 +609,12 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   );
 
   return (
-    <div className="w-full h-full relative" ref={flowWrapper}>
+    <div 
+      className="w-full h-full relative" 
+      ref={flowWrapper}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+    >
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <Button 
           variant="outline" 
@@ -562,101 +648,130 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
         </Button>
       </div>
       <div style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          connectionLineType={ConnectionLineType.SmoothStep}
-          onDragOver={onDragOver}
-          onDrop={onDrop}
-          fitView
-        >
-          <Controls />
-          <MiniMap />
-          <Background />
-          
-          <Panel position="top-left" className="bg-gray-800 p-2 rounded-md shadow-md flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-              onClick={() => setIsSaveDialogOpen(true)}
-              disabled={isLoading || !user}
-              aria-label="Save Flow"
+        <ContextMenu>
+          <ContextMenuTrigger>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              connectionLineType={ConnectionLineType.SmoothStep}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              fitView
             >
-              {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-              onClick={exportFlow}
-              aria-label="Export Flow"
+              <Controls />
+              <MiniMap />
+              <Background />
+              
+              <Panel position="top-left" className="bg-gray-800 p-2 rounded-md shadow-md flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={() => setIsSaveDialogOpen(true)}
+                  disabled={isLoading || !user}
+                  aria-label="Save Flow"
+                >
+                  {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={exportFlow}
+                  aria-label="Export Flow"
+                >
+                  <Download className="h-4 w-4" />
+                  Export
+                </Button>
+                <label className="flex items-center gap-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                    onClick={() => document.getElementById('file-input').click()}
+                    aria-label="Import Flow"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </Button>
+                  <input
+                    id="file-input"
+                    type="file"
+                    accept=".json"
+                    onChange={importFlow}
+                    className="hidden"
+                  />
+                </label>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={addNode}
+                  aria-label="Add Node"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Node
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-red-500 border-gray-300"
+                  onClick={deleteSelectedNodes}
+                  aria-label="Delete Selected"
+                  disabled={!nodes.some(node => node.selected)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+              </Panel>
+              
+              <Panel position="bottom-left" className="bg-gray-800 p-2 rounded-md shadow-md flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={undo}
+                  disabled={undoStack.length === 0}
+                  aria-label="Undo"
+                >
+                  <Undo className="h-4 w-4" />
+                  Undo
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={redo}
+                  disabled={redoStack.length === 0}
+                  aria-label="Redo"
+                >
+                  <Redo className="h-4 w-4" />
+                  Redo
+                </Button>
+              </Panel>
+            </ReactFlow>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => {
+                const selectedNode = nodes.find(node => node.selected);
+                if (selectedNode) {
+                  deleteNode(selectedNode.id);
+                }
+              }}
             >
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-            <label className="flex items-center gap-1">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-                onClick={() => document.getElementById('file-input').click()}
-                aria-label="Import Flow"
-              >
-                <Upload className="h-4 w-4" />
-                Import
-              </Button>
-              <input
-                id="file-input"
-                type="file"
-                accept=".json"
-                onChange={importFlow}
-                className="hidden"
-              />
-            </label>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-              onClick={addNode}
-              aria-label="Add Node"
-            >
-              <Plus className="h-4 w-4" />
-              Add Node
-            </Button>
-          </Panel>
-          
-          <Panel position="bottom-left" className="bg-gray-800 p-2 rounded-md shadow-md flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-              onClick={undo}
-              disabled={undoStack.length === 0}
-              aria-label="Undo"
-            >
-              <Undo className="h-4 w-4" />
-              Undo
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-              onClick={redo}
-              disabled={redoStack.length === 0}
-              aria-label="Redo"
-            >
-              <Redo className="h-4 w-4" />
-              Redo
-            </Button>
-          </Panel>
-        </ReactFlow>
+              <Trash2 className="h-4 w-4" />
+              Delete Node
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </div>
       
       {selectedNode && !onNodeSelect && (

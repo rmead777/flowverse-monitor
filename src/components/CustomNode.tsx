@@ -1,6 +1,7 @@
 
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
+import { ContextMenuTrigger } from '@/components/ui/context-menu';
 
 type MetricsType = {
   tasksProcessed: number;
@@ -73,52 +74,54 @@ const CustomNode = ({ data }: { data: NodeData }) => {
   const statusText = getStatusText(status);
 
   return (
-    <div 
-      className={`px-4 py-3 rounded-lg shadow-lg border-2 ${getNodeColor(type)}`}
-      role="button"
-      tabIndex={0}
-      aria-label={`${label} node, type: ${type}, status: ${statusText}`}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-white font-bold text-sm sm:text-base">{label}</div>
-        <div 
-          className={`h-3 w-3 rounded-full ${getStatusColor(status)}`} 
-          title={statusText}
-          aria-label={`Status: ${statusText}`}
-        />
+    <ContextMenuTrigger>
+      <div 
+        className={`px-4 py-3 rounded-lg shadow-lg border-2 ${getNodeColor(type)}`}
+        role="button"
+        tabIndex={0}
+        aria-label={`${label} node, type: ${type}, status: ${statusText}`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-white font-bold text-sm sm:text-base">{label}</div>
+          <div 
+            className={`h-3 w-3 rounded-full ${getStatusColor(status)}`} 
+            title={statusText}
+            aria-label={`Status: ${statusText}`}
+          />
+        </div>
+        <div className="text-xs text-gray-300 space-y-1">
+          <div className="flex justify-between">
+            <span>Tasks:</span> 
+            <span className="font-medium">{metrics.tasksProcessed}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Error rate:</span> 
+            <span className="font-medium">{(metrics.errorRate * 100).toFixed(1)}%</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Latency:</span> 
+            <span className="font-medium">{metrics.latency}ms</span>
+          </div>
+        </div>
+        
+        {type !== 'input' && type !== 'systemPrompt' && type !== 'userInput' && (
+          <Handle 
+            type="target" 
+            position={Position.Top} 
+            className="w-3 h-3" 
+            aria-label="Input connection"
+          />
+        )}
+        {type !== 'output' && type !== 'aiResponse' && (
+          <Handle 
+            type="source" 
+            position={Position.Bottom} 
+            className="w-3 h-3" 
+            aria-label="Output connection"
+          />
+        )}
       </div>
-      <div className="text-xs text-gray-300 space-y-1">
-        <div className="flex justify-between">
-          <span>Tasks:</span> 
-          <span className="font-medium">{metrics.tasksProcessed}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Error rate:</span> 
-          <span className="font-medium">{(metrics.errorRate * 100).toFixed(1)}%</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Latency:</span> 
-          <span className="font-medium">{metrics.latency}ms</span>
-        </div>
-      </div>
-      
-      {type !== 'input' && type !== 'systemPrompt' && type !== 'userInput' && (
-        <Handle 
-          type="target" 
-          position={Position.Top} 
-          className="w-3 h-3" 
-          aria-label="Input connection"
-        />
-      )}
-      {type !== 'output' && type !== 'aiResponse' && (
-        <Handle 
-          type="source" 
-          position={Position.Bottom} 
-          className="w-3 h-3" 
-          aria-label="Output connection"
-        />
-      )}
-    </div>
+    </ContextMenuTrigger>
   );
 };
 
