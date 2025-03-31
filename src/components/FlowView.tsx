@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -126,21 +127,21 @@ const FlowView = () => {
         <Button 
           variant="outline" 
           size="sm" 
-          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white border-blue-500"
+          className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
         >
           Zoom In
         </Button>
         <Button 
           variant="outline" 
           size="sm" 
-          className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white border-green-500"
+          className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
         >
           Zoom Out
         </Button>
         <Button 
           variant="outline" 
           size="sm" 
-          className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500"
+          className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
         >
           Reset View
         </Button>
