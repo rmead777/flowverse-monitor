@@ -18,35 +18,80 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
 
   const renderProperties = () => {
     switch (selectedNode.data.type) {
-      case 'systemPrompt':
-      case 'userInput':
-      case 'aiResponse':
-      case 'action':
-      case 'apiCall':
-      case 'configuration':
-      case 'input':
-      case 'process':
-      case 'output':
-      case 'ai':
-      case 'retriever':
-      case 'contextManager':
-      case 'feedback':
-        return <NodeDetails 
-          node={selectedNode} 
-          onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
-        />;
       case 'ranker':
         return (
           <RankerNodeProperties
             nodeData={selectedNode.data}
-            onUpdateNode={onUpdateNode}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
           />
         );
+      case 'ai':
+        return (
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-white mb-4">AI Node Properties</div>
+            <NodeDetails 
+              node={selectedNode} 
+              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
+            />
+            {/* AI-specific properties would go here */}
+            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-2">AI Model Configuration</h3>
+              <div className="text-xs text-gray-400">
+                Note: AI model configuration options will be implemented in a future update.
+              </div>
+            </div>
+          </div>
+        );
+      case 'retriever':
+        return (
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-white mb-4">Retriever Node Properties</div>
+            <NodeDetails 
+              node={selectedNode} 
+              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
+            />
+            {/* Retriever-specific properties would go here */}
+            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-2">Vector Database Settings</h3>
+              <div className="text-xs text-gray-400">
+                Note: Vector database configuration options will be implemented in a future update.
+              </div>
+            </div>
+          </div>
+        );
+      case 'systemPrompt':
+        return (
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-white mb-4">System Prompt Properties</div>
+            <NodeDetails 
+              node={selectedNode} 
+              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
+            />
+            {/* System Prompt-specific properties would go here */}
+            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-2">Prompt Template</h3>
+              <div className="text-xs text-gray-400">
+                Note: Prompt template configuration will be implemented in a future update.
+              </div>
+            </div>
+          </div>
+        );
       default:
-        return <NodeDetails 
-          node={selectedNode} 
-          onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)}
-        />;
+        return (
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-white mb-4">{selectedNode.data.type} Properties</div>
+            <NodeDetails 
+              node={selectedNode} 
+              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)}
+            />
+            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-2">Node Configuration</h3>
+              <div className="text-xs text-gray-400">
+                Note: Specific configuration options for this node type will be implemented in a future update.
+              </div>
+            </div>
+          </div>
+        );
     }
   };
 
