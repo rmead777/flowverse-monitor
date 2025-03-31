@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-export type NodeType = 'userInput' | 'systemPrompt' | 'aiResponse' | 'action' | 'apiCall' | 'configuration' | 'process' | 'retriever' | 'contextManager' | 'feedback';
+export type NodeType = 'userInput' | 'systemPrompt' | 'aiResponse' | 'action' | 'apiCall' | 'configuration' | 'process' | 'retriever' | 'contextManager' | 'feedback' | 'ranker';
 
 interface NodeTypeOption {
   value: NodeType;
@@ -33,6 +33,11 @@ const nodeTypeOptions: NodeTypeOption[] = [
     value: 'retriever',
     label: 'Retriever',
     description: 'Fetches relevant documents from knowledge bases.'
+  },
+  {
+    value: 'ranker',
+    label: 'Ranker',
+    description: 'Re-ranks retrieved documents to improve relevance.'
   },
   {
     value: 'contextManager',

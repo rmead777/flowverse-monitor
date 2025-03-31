@@ -20,6 +20,8 @@ type MetricsType = {
   contextSize?: number;
   messageCount?: number;
   processingTime?: number;
+  rerankingLatency?: number;
+  relevanceImprovement?: number;
 };
 
 type NodeData = {
@@ -53,6 +55,8 @@ const getNodeColor = (type: string) => {
       return 'bg-green-900 border-green-500'; // Green for AI Response
     case 'retriever':
       return 'bg-cyan-900 border-cyan-500'; // Cyan for Retriever (was blue)
+    case 'ranker':
+      return 'bg-gray-900 border-gray-400'; // Silver/White for Ranker
     case 'contextManager':
       return 'bg-amber-900 border-amber-500'; // Amber for Context Manager (was yellow)
     case 'feedback':
@@ -99,6 +103,13 @@ const getMetricsForNodeType = (type: string, metrics: MetricsType) => {
           warning: metrics.precision && metrics.precision < 0.7 },
         { label: 'Latency:', value: metrics.retrievalLatency ? `${metrics.retrievalLatency}ms` : '0ms',
           warning: metrics.retrievalLatency && metrics.retrievalLatency > 1000 }
+      ];
+    case 'ranker':
+      return [
+        { label: 'Latency:', value: metrics.rerankingLatency ? `${metrics.rerankingLatency}ms` : '0ms',
+          warning: metrics.rerankingLatency && metrics.rerankingLatency > 500 },
+        { label: 'Relevance Impr:', value: metrics.relevanceImprovement ? `${(metrics.relevanceImprovement * 100).toFixed(1)}%` : '0%',
+          warning: metrics.relevanceImprovement && metrics.relevanceImprovement < 0.1 }
       ];
     case 'aiResponse':
       return [

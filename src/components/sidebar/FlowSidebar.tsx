@@ -1,11 +1,10 @@
-
 import { useCallback, useState } from 'react';
 import { 
   File, Pen, Code, Database, 
   MessageSquare, Terminal, Sparkles, 
   Globe, Settings, Workflow, 
   Search, Layers, ThumbsUp, BookOpen,
-  ChevronDown
+  ChevronDown, BarChart2
 } from 'lucide-react';
 import { 
   Collapsible, 
@@ -88,6 +87,13 @@ const nodeTypes = [
         description: 'Fetches relevant documents from knowledge bases.',
         icon: <Search className="h-5 w-5" />,
         color: '#60a5fa' // Blue
+      },
+      {
+        type: 'ranker',
+        title: 'Ranker',
+        description: 'Re-ranks retrieved documents to improve relevance.',
+        icon: <BarChart2 className="h-5 w-5" />,
+        color: '#d1d5db' // White/Silver
       },
       {
         type: 'contextManager',
@@ -509,6 +515,11 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
           contextSize: 0,
           messageCount: 0,
           processingTime: 0,
+        };
+      case 'ranker':
+        return {
+          rerankingLatency: 0,
+          relevanceImprovement: 0.0,
         };
       default:
         return {
