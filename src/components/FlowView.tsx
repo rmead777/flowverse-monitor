@@ -113,10 +113,8 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
-// Custom type for JSON data
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
-// Typing for our database tables
 type FlowConfigurationType = {
   id: string;
   user_id: string;
@@ -159,7 +157,6 @@ const FlowView = () => {
   const reactFlowInstance = useReactFlow();
   const flowWrapper = useRef(null);
   
-  // Fetch existing flow configurations
   useEffect(() => {
     if (user) {
       fetchFlowConfigurations();
@@ -187,7 +184,6 @@ const FlowView = () => {
     }
   };
 
-  // Connect via standard connection mechanism
   const onConnect = useCallback(
     (params) => {
       const newEdge = { ...params, id: `e${params.source}-${params.target}`, animated: true };
@@ -197,7 +193,6 @@ const FlowView = () => {
     [setEdges]
   );
 
-  // Track history for undo/redo functionality
   const saveToUndoHistory = useCallback(() => {
     setUndoStack((stack) => [
       ...stack,
@@ -232,7 +227,6 @@ const FlowView = () => {
     setRedoStack((stack) => stack.slice(0, -1));
   }, [undoStack, redoStack, nodes, edges, setNodes, setEdges]);
 
-  // Node selection and details
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
   }, []);
@@ -241,7 +235,6 @@ const FlowView = () => {
     setSelectedNode(null);
   }, []);
 
-  // Zoom controls
   const zoomIn = useCallback(() => {
     reactFlowInstance.zoomIn();
   }, [reactFlowInstance]);
@@ -254,7 +247,6 @@ const FlowView = () => {
     reactFlowInstance.fitView({ padding: 0.2 });
   }, [reactFlowInstance]);
 
-  // Save flow configuration to Supabase
   const saveFlow = useCallback(async (name, description) => {
     if (!user) {
       toast({
@@ -301,7 +293,6 @@ const FlowView = () => {
     }
   }, [user, nodes, edges, toast]);
 
-  // Load a flow configuration from Supabase
   const loadFlow = useCallback(async (id) => {
     setIsLoading(true);
     
@@ -316,8 +307,8 @@ const FlowView = () => {
       
       if (data) {
         saveToUndoHistory();
-        setNodes(data.nodes);
-        setEdges(data.edges);
+        setNodes(data.nodes as unknown as Node[]);
+        setEdges(data.edges as unknown as Edge[]);
         
         toast({
           title: 'Flow loaded successfully',
@@ -336,7 +327,6 @@ const FlowView = () => {
     }
   }, [setNodes, setEdges, toast, saveToUndoHistory]);
 
-  // Export flow to JSON file
   const exportFlow = useCallback(() => {
     const flowData = {
       nodes,
@@ -364,7 +354,6 @@ const FlowView = () => {
     });
   }, [nodes, edges, toast]);
 
-  // Import flow from JSON file
   const importFlow = useCallback((event) => {
     const fileInput = event.target;
     const file = fileInput.files[0];
@@ -404,11 +393,9 @@ const FlowView = () => {
       reader.readAsText(file);
     }
     
-    // Reset file input
     fileInput.value = '';
   }, [setNodes, setEdges, toast, saveToUndoHistory]);
 
-  // Log metrics to Supabase
   const logNodeMetrics = useCallback(async (node) => {
     if (!node || !node.data) return;
     
@@ -429,7 +416,6 @@ const FlowView = () => {
     }
   }, []);
 
-  // Add a new node
   const addNode = useCallback(() => {
     const newNode = {
       id: uuidv4(),
