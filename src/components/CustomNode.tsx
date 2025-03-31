@@ -175,7 +175,8 @@ const CustomNode = ({ data }: { data: NodeData }) => {
                   aria-label="Input connection"
                 />
               )}
-              {type !== 'output' && type !== 'aiResponse' && (
+              {/* Modified this condition to ensure aiResponse nodes also have an output handle */}
+              {type !== 'output' && (
                 <Handle 
                   type="source" 
                   position={Position.Bottom} 
