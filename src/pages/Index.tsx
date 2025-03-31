@@ -1,12 +1,36 @@
 
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
 import { Cpu, Save, Download, Play, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ReactFlowProvider } from "reactflow";
+import FlowSidebar from "@/components/sidebar/FlowSidebar";
+import PropertyPanel from "@/components/PropertyPanel/PropertyPanel";
 
 const Index = () => {
   const { signOut } = useAuth();
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
+
+  const handleSelectTemplate = useCallback((nodes, edges) => {
+    setFlowData({ nodes, edges });
+  }, []);
+
+  const handleNodeSelect = useCallback((node) => {
+    setSelectedNode(node);
+  }, []);
+
+  const handleNodeUpdate = useCallback((updatedData) => {
+    setFlowData(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(node => 
+        node.id === selectedNode.id 
+          ? { ...node, data: updatedData } 
+          : node
+      )
+    }));
+  }, [selectedNode]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -54,27 +78,25 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-48 border-r border-gray-800 bg-gray-950 p-4">
-          <div className="space-y-2">
-            <div className="px-3 py-2 rounded bg-gray-800 text-white font-medium flex items-center">
-              Flow Overview
-            </div>
-            <div className="px-3 py-2 rounded hover:bg-gray-800 text-gray-400 hover:text-white transition-colors cursor-pointer">
-              Agent Metrics
-            </div>
-            <div className="px-3 py-2 rounded hover:bg-gray-800 text-gray-400 hover:text-white transition-colors cursor-pointer">
-              Logs
-            </div>
-          </div>
-        </div>
+        {/* Left Sidebar */}
+        <FlowSidebar onSelectTemplate={handleSelectTemplate} />
 
         {/* Flow View */}
         <div className="flex-1 overflow-hidden bg-gray-950">
           <ReactFlowProvider>
-            <FlowView />
+            <FlowView 
+              onNodeSelect={handleNodeSelect} 
+              initialFlowData={flowData}
+            />
           </ReactFlowProvider>
         </div>
+
+        {/* Properties Panel */}
+        <PropertyPanel 
+          selectedNode={selectedNode} 
+          onUpdateNode={handleNodeUpdate}
+          onClose={() => setSelectedNode(null)}
+        />
       </div>
 
       {/* Status Bar */}

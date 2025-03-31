@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -143,9 +144,14 @@ type AgentLogsType = {
   timestamp: string;
 }
 
-const FlowView = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+interface FlowViewProps {
+  onNodeSelect?: (node: Node) => void;
+  initialFlowData?: { nodes: Node[], edges: Edge[] };
+}
+
+const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialFlowData?.nodes?.length ? initialFlowData.nodes : initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialFlowData?.edges?.length ? initialFlowData.edges : initialEdges);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -156,6 +162,14 @@ const FlowView = () => {
   const { user } = useAuth();
   const reactFlowInstance = useReactFlow();
   const flowWrapper = useRef(null);
+  
+  // Update flow when initialFlowData changes
+  useEffect(() => {
+    if (initialFlowData?.nodes?.length) {
+      setNodes(initialFlowData.nodes);
+      setEdges(initialFlowData.edges);
+    }
+  }, [initialFlowData, setNodes, setEdges]);
   
   useEffect(() => {
     if (user) {
@@ -229,7 +243,10 @@ const FlowView = () => {
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
-  }, []);
+    if (onNodeSelect) {
+      onNodeSelect(node);
+    }
+  }, [onNodeSelect]);
 
   const closeNodeDetails = useCallback(() => {
     setSelectedNode(null);
@@ -439,6 +456,7 @@ const FlowView = () => {
     saveToUndoHistory();
     setNodes((nds) => [...nds, newNode]);
     
+    // Log the new node creation
     const logOperation = async () => {
       try {
         const { error } = await supabase
@@ -447,7 +465,7 @@ const FlowView = () => {
             agent_name: 'New Node',
             event_type: 'node_created',
             details: { node_id: newNode.id } as Json
-          }]) as { error: any };
+          }]);
           
         if (error) console.error('Error logging node creation:', error);
       } catch (err) {
@@ -457,6 +475,57 @@ const FlowView = () => {
     
     logOperation();
   }, [setNodes, saveToUndoHistory]);
+
+  // Handle node drag from sidebar
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+
+      const reactFlowBounds = flowWrapper.current.getBoundingClientRect();
+      const nodeData = event.dataTransfer.getData('application/reactflow');
+      
+      if (!nodeData) return;
+      
+      const position = reactFlowInstance.project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
+      
+      const newNode = JSON.parse(nodeData);
+      newNode.position = position;
+      
+      saveToUndoHistory();
+      setNodes((nds) => [...nds, newNode]);
+
+      // Log the new node creation from drag
+      const logOperation = async () => {
+        try {
+          const { error } = await supabase
+            .from('agent_logs')
+            .insert([{
+              agent_name: newNode.data.label,
+              event_type: 'node_created',
+              details: { 
+                node_id: newNode.id,
+                node_type: newNode.data.type
+              } as Json
+            }]);
+            
+          if (error) console.error('Error logging node creation:', error);
+        } catch (err) {
+          console.error('Error logging node creation:', err);
+        }
+      };
+      
+      logOperation();
+    },
+    [reactFlowInstance, setNodes, saveToUndoHistory]
+  );
 
   return (
     <div className="w-full h-full relative" ref={flowWrapper}>
@@ -502,6 +571,8 @@ const FlowView = () => {
           onNodeClick={onNodeClick}
           nodeTypes={nodeTypes}
           connectionLineType={ConnectionLineType.SmoothStep}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
           fitView
         >
           <Controls />
@@ -588,7 +659,7 @@ const FlowView = () => {
         </ReactFlow>
       </div>
       
-      {selectedNode && (
+      {selectedNode && !onNodeSelect && (
         <NodeDetails 
           node={selectedNode} 
           onClose={closeNodeDetails}
