@@ -6,7 +6,7 @@ import { Database, Globe, Server } from 'lucide-react';
 interface KnowledgeBaseItemProps {
   name: string;
   type: string;
-  status: 'active' | 'indexing' | 'error';
+  status: string; // Changed from 'active' | 'indexing' | 'error' to string
   onClick: () => void;
 }
 
@@ -25,7 +25,10 @@ const KnowledgeBaseItem = ({ name, type, status, onClick }: KnowledgeBaseItemPro
   };
 
   const getStatusColor = (): string => {
-    switch (status) {
+    // Convert status to lowercase to handle case variations
+    const statusLower = status.toLowerCase();
+    
+    switch (statusLower) {
       case 'active':
         return 'bg-green-500';
       case 'indexing':
@@ -33,7 +36,7 @@ const KnowledgeBaseItem = ({ name, type, status, onClick }: KnowledgeBaseItemPro
       case 'error':
         return 'bg-red-500';
       default:
-        return 'bg-gray-500';
+        return 'bg-gray-500'; // Default color for unknown status values
     }
   };
 
