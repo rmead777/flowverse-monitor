@@ -105,10 +105,41 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
     }
   };
 
+  const getNodeType = () => {
+    if (!nodeData) return null;
+    
+    // If the node has a specific "type" property, use that
+    if (nodeData.type) {
+      return nodeData.type;
+    }
+    
+    // For template nodes that might not have a proper type field set
+    // Infer type from the node's internal properties or visual type
+    if (selectedNode.type === 'input' || nodeData.inputType !== undefined) {
+      return 'userInput';
+    } else if (selectedNode.type === 'output' || nodeData.model !== undefined) {
+      return 'aiResponse';
+    } else if (nodeData.prompt !== undefined) {
+      return 'systemPrompt';
+    } else if (nodeData.actionType !== undefined) {
+      return 'action';
+    } else if (nodeData.endpoint !== undefined) {
+      return 'apiCall';
+    } else if (nodeData.configType !== undefined) {
+      return 'configuration';
+    }
+    
+    // Default case, try to use the node's visual type
+    return selectedNode.type || null;
+  };
+
   const renderFieldsByType = () => {
     if (!nodeData) return null;
 
-    switch (nodeData.type) {
+    // Get the effective node type, handling different node sources
+    const effectiveType = getNodeType();
+
+    switch (effectiveType) {
       case 'systemPrompt':
         return (
           <>
@@ -411,7 +442,7 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
                   min="0"
                   max="100"
                   step="0.1"
-                  value={(nodeData.metrics?.errorRate * 100).toFixed(1)}
+                  value={nodeData.metrics?.errorRate ? (nodeData.metrics.errorRate * 100).toFixed(1) : "0.0"}
                   onChange={(e) => handleMetricsChange('errorRate', parseFloat(e.target.value) / 100 || 0)}
                 />
               </div>

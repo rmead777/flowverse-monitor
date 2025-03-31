@@ -18,6 +18,42 @@ const Index = () => {
   }, []);
 
   const handleNodeSelect = useCallback((node) => {
+    // Ensure node has a properly initialized data object with type information
+    if (node && node.data) {
+      // Initialize standard properties if they don't exist
+      if (!node.data.type) {
+        // Infer type from node's visual type if possible
+        switch (node.type) {
+          case 'input':
+            node.data.type = 'userInput';
+            if (!node.data.inputType) node.data.inputType = 'text';
+            break;
+          case 'output':
+            node.data.type = 'aiResponse';
+            if (!node.data.model) node.data.model = 'gpt-4o';
+            if (node.data.temperature === undefined) node.data.temperature = 0.7;
+            if (!node.data.maxTokens) node.data.maxTokens = 1024;
+            break;
+          case 'custom':
+            // Try to infer from existing properties
+            if (node.data.prompt !== undefined) node.data.type = 'systemPrompt';
+            else if (node.data.endpoint !== undefined) node.data.type = 'apiCall';
+            else if (node.data.actionType !== undefined) node.data.type = 'action';
+            else if (node.data.configType !== undefined) node.data.type = 'configuration';
+            break;
+        }
+      }
+      
+      // Initialize metrics if they don't exist
+      if (!node.data.metrics) {
+        node.data.metrics = {
+          tasksProcessed: 0,
+          errorRate: 0,
+          latency: 0
+        };
+      }
+    }
+    
     setSelectedNode(node);
   }, []);
 
