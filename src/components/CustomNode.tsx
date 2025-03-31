@@ -11,7 +11,7 @@ type MetricsType = {
 type NodeData = {
   label: string;
   status: 'active' | 'idle' | 'error';
-  type: 'input' | 'process' | 'output' | 'ai';
+  type: string;
   metrics: MetricsType;
 };
 
@@ -30,6 +30,18 @@ const getStatusColor = (status: string) => {
 
 const getNodeColor = (type: string) => {
   switch (type) {
+    case 'systemPrompt':
+      return 'bg-purple-900 border-purple-500'; // Purple for System Prompt
+    case 'userInput':
+      return 'bg-blue-900 border-blue-500'; // Blue for User Input
+    case 'aiResponse':
+      return 'bg-green-900 border-green-500'; // Green for AI Response
+    case 'action':
+      return 'bg-orange-900 border-orange-500'; // Orange for Action
+    case 'apiCall':
+      return 'bg-pink-900 border-pink-500'; // Pink for API Call
+    case 'configuration':
+      return 'bg-yellow-900 border-yellow-500'; // Yellow for Configuration
     case 'input':
       return 'bg-blue-900 border-blue-500';
     case 'process':
@@ -90,7 +102,7 @@ const CustomNode = ({ data }: { data: NodeData }) => {
         </div>
       </div>
       
-      {type !== 'input' && (
+      {type !== 'input' && type !== 'systemPrompt' && type !== 'userInput' && (
         <Handle 
           type="target" 
           position={Position.Top} 
@@ -98,7 +110,7 @@ const CustomNode = ({ data }: { data: NodeData }) => {
           aria-label="Input connection"
         />
       )}
-      {type !== 'output' && (
+      {type !== 'output' && type !== 'aiResponse' && (
         <Handle 
           type="source" 
           position={Position.Bottom} 

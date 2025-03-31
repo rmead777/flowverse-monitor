@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { 
   File, Pen, Code, Database, 
@@ -345,7 +346,7 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
       data: { 
         label: nodeData.title,
         status: 'idle',
-        type: nodeType,
+        type: nodeType, // Ensure we pass the exact node type for coloring
         metrics: {
           tasksProcessed: 0,
           errorRate: 0.0,
