@@ -2,7 +2,7 @@
 import { memo } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import NodeDetails from '../NodeDetails';
+import NodeDetails from './NodeDetailsInline';
 import RankerNodeProperties from './RankerNodeProperties';
 
 interface PropertyPanelProps {
@@ -33,8 +33,7 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
       case 'feedback':
         return <NodeDetails 
           node={selectedNode} 
-          onClose={onClose}
-          onMetricsUpdate={() => onUpdateNode(selectedNode.data)} 
+          onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
         />;
       case 'ranker':
         return (
@@ -46,8 +45,7 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
       default:
         return <NodeDetails 
           node={selectedNode} 
-          onClose={onClose} 
-          onMetricsUpdate={() => onUpdateNode(selectedNode.data)}
+          onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)}
         />;
     }
   };
