@@ -2,11 +2,15 @@
 import { memo } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import NodeDetails from './NodeDetailsInline';
+import NodeDetailsInline from './NodeDetailsInline';
 import RankerNodeProperties from './RankerNodeProperties';
 import AINodeProperties from './AINodeProperties';
 import RetrieverNodeProperties from './RetrieverNodeProperties';
 import SystemPromptProperties from './SystemPromptProperties';
+import UserInputNodeProperties from './UserInputNodeProperties';
+import ContextManagerNodeProperties from './ContextManagerNodeProperties';
+import ConfigurationNodeProperties from './ConfigurationNodeProperties';
+import FeedbackCollectorNodeProperties from './FeedbackCollectorNodeProperties';
 
 interface PropertyPanelProps {
   selectedNode: any;
@@ -21,16 +25,16 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
 
   const renderProperties = () => {
     switch (selectedNode.data.type) {
-      case 'ranker':
+      case 'userInput':
         return (
-          <RankerNodeProperties
+          <UserInputNodeProperties
             nodeData={selectedNode.data}
             onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
           />
         );
-      case 'ai':
+      case 'contextManager':
         return (
-          <AINodeProperties
+          <ContextManagerNodeProperties
             nodeData={selectedNode.data}
             onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
           />
@@ -42,9 +46,38 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
             onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
           />
         );
+      case 'ranker':
+        return (
+          <RankerNodeProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
+        );
+      case 'ai':
+      case 'aiResponse':
+        return (
+          <AINodeProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
+        );
       case 'systemPrompt':
         return (
           <SystemPromptProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
+        );
+      case 'configuration':
+        return (
+          <ConfigurationNodeProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
+        );
+      case 'feedback':
+        return (
+          <FeedbackCollectorNodeProperties
             nodeData={selectedNode.data}
             onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
           />
@@ -53,7 +86,7 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
         return (
           <div className="space-y-4">
             <div className="text-lg font-semibold text-white mb-4">{selectedNode.data.type} Properties</div>
-            <NodeDetails 
+            <NodeDetailsInline 
               node={selectedNode} 
               onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)}
             />
