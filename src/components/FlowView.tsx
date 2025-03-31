@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -25,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import SaveFlowDialog from './SaveFlowDialog';
 import { v4 as uuidv4 } from 'uuid';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import NodeTypeDialog, { NodeType } from './NodeTypeDialog';
 
 const initialNodes = [
   {
@@ -190,7 +190,6 @@ interface FlowViewProps {
 }
 
 const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
-  // Initialize with empty arrays, we'll set them from props in useEffect
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -199,6 +198,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const [flowConfigurations, setFlowConfigurations] = useState<FlowConfigurationType[]>([]);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
+  const [isNodeTypeDialogOpen, setIsNodeTypeDialogOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const reactFlowInstance = useReactFlow();
@@ -271,19 +271,15 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     });
   }, []);
   
-  // Use effect to reset nodes and edges when initialFlowData changes
   useEffect(() => {
-    // If initialFlowData has nodes, use those, otherwise use empty arrays
     if (initialFlowData) {
       if (initialFlowData.nodes && initialFlowData.nodes.length > 0) {
         setNodes(ensureNodeProperties(initialFlowData.nodes));
         setEdges(initialFlowData.edges || []);
       } else {
-        // This is a blank flow, reset everything
         setNodes([]);
         setEdges([]);
         
-        // Also clear undo/redo stacks when starting a new flow
         setUndoStack([]);
         setRedoStack([]);
       }
@@ -553,7 +549,74 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     }
   }, []);
 
-  const addNode = useCallback(() => {
+  const getDefaultDataForType = (nodeType: NodeType) => {
+    switch (nodeType) {
+      case 'userInput':
+        return {
+          label: 'User Input',
+          status: 'idle',
+          type: 'userInput',
+          inputType: 'text',
+          preprocessing: 'none',
+        };
+      case 'systemPrompt':
+        return {
+          label: 'System Prompt',
+          status: 'idle',
+          type: 'systemPrompt',
+          prompt: '',
+        };
+      case 'aiResponse':
+        return {
+          label: 'AI Response',
+          status: 'idle',
+          type: 'aiResponse',
+          model: 'gpt-4o',
+          temperature: 0.7,
+          maxTokens: 1024,
+        };
+      case 'action':
+        return {
+          label: 'Action',
+          status: 'idle',
+          type: 'action',
+          actionType: 'transform',
+          actionParams: '{}',
+        };
+      case 'apiCall':
+        return {
+          label: 'API Call',
+          status: 'idle',
+          type: 'apiCall',
+          endpoint: '',
+          method: 'GET',
+          headers: '{}',
+        };
+      case 'configuration':
+        return {
+          label: 'Configuration',
+          status: 'idle',
+          type: 'configuration',
+          configType: 'modelParams',
+          configParams: '{}',
+        };
+      default:
+        return {
+          label: 'New Node',
+          status: 'idle',
+          type: 'process',
+        };
+    }
+  };
+
+  const addNode = useCallback((nodeType?: NodeType) => {
+    if (!nodeType) {
+      setIsNodeTypeDialogOpen(true);
+      return;
+    }
+
+    const defaultData = getDefaultDataForType(nodeType);
+    
     const newNode = {
       id: uuidv4(),
       type: 'custom',
@@ -562,9 +625,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
         y: Math.random() * 400 + 50 
       },
       data: { 
-        label: 'New Node',
-        status: 'idle',
-        type: 'process',
+        ...defaultData,
         metrics: {
           tasksProcessed: 0,
           errorRate: 0.0,
@@ -596,7 +657,12 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     };
     
     logOperation();
-  }, [setNodes, saveToUndoHistory]);
+
+    toast({
+      title: `Added ${nodeType} node`,
+      description: `Added a new ${nodeType} node to the flow`,
+    });
+  }, [setNodes, saveToUndoHistory, toast]);
 
   const deleteSelectedNodes = useCallback(() => {
     const selectedNodes = nodes.filter(node => node.selected);
@@ -840,7 +906,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
                   variant="outline" 
                   size="sm" 
                   className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
-                  onClick={addNode}
+                  onClick={() => setIsNodeTypeDialogOpen(true)}
                   aria-label="Add Node"
                 >
                   <Plus className="h-4 w-4" />
@@ -919,6 +985,12 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
           existingFlows={flowConfigurations}
         />
       )}
+      
+      <NodeTypeDialog
+        isOpen={isNodeTypeDialogOpen}
+        onClose={() => setIsNodeTypeDialogOpen(false)}
+        onSelectType={(type) => addNode(type)}
+      />
     </div>
   );
 };
