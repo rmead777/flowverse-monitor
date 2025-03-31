@@ -549,10 +549,10 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   }, [nodes, setNodes, setEdges, saveToUndoHistory, toast, user]);
 
   const onKeyDown = useCallback((event: KeyboardEvent) => {
-    const activeElement = document.activeElement;
-    const isInput = activeElement.tagName === 'INPUT' || 
-                    activeElement.tagName === 'TEXTAREA' || 
-                    activeElement.isContentEditable;
+    const activeElement = document.activeElement as HTMLElement;
+    const isInput = activeElement?.tagName === 'INPUT' || 
+                    activeElement?.tagName === 'TEXTAREA' || 
+                    activeElement?.getAttribute('contenteditable') === 'true';
     
     if (!isInput && (event.key === 'Delete' || event.key === 'Backspace')) {
       deleteSelectedNodes();

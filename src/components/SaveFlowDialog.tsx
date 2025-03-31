@@ -86,7 +86,7 @@ const SaveFlowDialog = ({ isOpen, onClose, onSave, isLoading, existingFlows }: S
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading} className="text-black bg-white hover:bg-gray-100">
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isLoading}>
