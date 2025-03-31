@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -451,17 +450,23 @@ const FlowView = () => {
     saveToUndoHistory();
     setNodes((nds) => [...nds, newNode]);
     
-    // Log the new node creation
-    supabase
-      .from('agent_logs')
-      .insert([{
-        agent_name: 'New Node',
-        event_type: 'node_created',
-        details: { node_id: newNode.id }
-      }]) as { error: any }
-      .then(({ error }) => {
+    const logOperation = async () => {
+      try {
+        const { error } = await supabase
+          .from('agent_logs')
+          .insert([{
+            agent_name: 'New Node',
+            event_type: 'node_created',
+            details: { node_id: newNode.id }
+          }]) as { error: any };
+          
         if (error) console.error('Error logging node creation:', error);
-      });
+      } catch (err) {
+        console.error('Error logging node creation:', err);
+      }
+    };
+    
+    logOperation();
   }, [setNodes, saveToUndoHistory]);
 
   return (
