@@ -11,6 +11,7 @@ import ReactFlow, {
   useReactFlow,
   Panel,
   ConnectionLineType,
+  MiniMapProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from './ui/button';
@@ -112,6 +113,33 @@ const initialEdges = [
 
 const nodeTypes = {
   custom: CustomNode,
+};
+
+const customMiniMapNodeColor = (node: Node) => {
+  if (!node || !node.data) return '#d0c0f7';
+
+  switch (node.data.type) {
+    case 'systemPrompt':
+      return 'rgba(126, 34, 206, 0.7)';
+    case 'userInput':
+    case 'input':
+      return 'rgba(30, 64, 175, 0.7)';
+    case 'aiResponse':
+    case 'output':
+      return 'rgba(6, 95, 70, 0.7)';
+    case 'action':
+      return 'rgba(194, 65, 12, 0.7)';
+    case 'apiCall':
+      return 'rgba(157, 23, 77, 0.7)';
+    case 'configuration':
+      return 'rgba(161, 98, 7, 0.7)';
+    case 'process':
+      return 'rgba(88, 28, 135, 0.7)';
+    case 'ai':
+      return 'rgba(67, 56, 202, 0.7)';
+    default:
+      return 'rgba(17, 24, 39, 0.7)';
+  }
 };
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
@@ -664,7 +692,11 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
               fitView
             >
               <Controls />
-              <MiniMap />
+              <MiniMap 
+                nodeColor={customMiniMapNodeColor}
+                maskColor="rgba(240, 240, 240, 0.3)" 
+                className="bg-opacity-60 bg-gray-950 rounded-lg" 
+              />
               <Background />
               
               <Panel position="top-left" className="bg-gray-800 p-2 rounded-md shadow-md flex gap-2">
