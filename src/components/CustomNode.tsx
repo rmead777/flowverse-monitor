@@ -48,15 +48,15 @@ const getNodeColor = (type: string) => {
     case 'systemPrompt':
       return 'bg-purple-900 border-purple-500'; // Purple for System Prompt
     case 'userInput':
-      return 'bg-blue-900 border-blue-500'; // Blue for User Input
+      return 'bg-blue-900 border-blue-500'; // Dark Blue for User Input
     case 'aiResponse':
       return 'bg-green-900 border-green-500'; // Green for AI Response
     case 'retriever':
-      return 'bg-blue-900 border-blue-500'; // Blue for Retriever
+      return 'bg-cyan-900 border-cyan-500'; // Cyan for Retriever (was blue)
     case 'contextManager':
-      return 'bg-yellow-900 border-yellow-500'; // Yellow for Context Manager
+      return 'bg-amber-900 border-amber-500'; // Amber for Context Manager (was yellow)
     case 'feedback':
-      return 'bg-green-900 border-green-500'; // Green for Feedback
+      return 'bg-emerald-900 border-emerald-500'; // Emerald for Feedback (was green)
     case 'action':
       return 'bg-orange-900 border-orange-500'; // Orange for Action
     case 'apiCall':
@@ -64,13 +64,13 @@ const getNodeColor = (type: string) => {
     case 'configuration':
       return 'bg-yellow-900 border-yellow-500'; // Yellow for Configuration
     case 'input':
-      return 'bg-blue-900 border-blue-500';
+      return 'bg-indigo-900 border-indigo-500'; // Indigo for Input (was blue)
     case 'process':
-      return 'bg-purple-900 border-purple-500';
+      return 'bg-fuchsia-900 border-fuchsia-500'; // Fuchsia for Process (was purple)
     case 'output':
-      return 'bg-green-900 border-green-500';
+      return 'bg-lime-900 border-lime-500'; // Lime for Output (was green)
     case 'ai':
-      return 'bg-indigo-900 border-indigo-500';
+      return 'bg-violet-900 border-violet-500'; // Violet for AI (was indigo)
     default:
       return 'bg-gray-900 border-gray-500';
   }
