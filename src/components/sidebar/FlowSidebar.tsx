@@ -1,9 +1,8 @@
-
 import { useCallback } from 'react';
 import { 
   File, Pen, Code, Database, 
   MessageSquare, Terminal, Sparkles, 
-  ApiIcon, Settings, Workflow 
+  Globe, Settings, Workflow 
 } from 'lucide-react';
 import { 
   Collapsible, 
@@ -86,7 +85,7 @@ const nodeTypes = [
         type: 'apiCall',
         title: 'API Call',
         description: 'Connects to external services and APIs to fetch or send data.',
-        icon: <ApiIcon className="h-5 w-5" />,
+        icon: <Globe className="h-5 w-5" />,
         color: '#f43f5e' // Pink
       }
     ]
