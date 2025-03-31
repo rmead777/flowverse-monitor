@@ -14,11 +14,11 @@ const Index = () => {
   const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
 
   const handleSelectTemplate = useCallback((nodes, edges) => {
+    // This now properly sets the flow data regardless of whether it's blank or not
     setFlowData({ nodes, edges });
   }, []);
 
   const handleNodeSelect = useCallback((node) => {
-    // Node properties are now handled directly in FlowView component
     setSelectedNode(node);
   }, []);
 

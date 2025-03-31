@@ -315,6 +315,7 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
   const handleTemplateSelect = useCallback((templateId: string) => {
     const templateData = templateFlows[templateId];
     if (templateData) {
+      // Always pass the template data to clear current nodes/edges
       onSelectTemplate(templateData.nodes, templateData.edges);
       
       toast({
