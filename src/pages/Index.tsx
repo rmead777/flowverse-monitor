@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
@@ -122,7 +123,8 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="metrics" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
-            <MetricsDashboardView>
+            <MetricsDashboardView />
+            <div className="mt-4">
               <DropdownMenu>
                 <DropdownMenuTrigger className="text-white hover:text-black hover:bg-white px-3 py-1.5 rounded">
                   Metrics Options
@@ -140,11 +142,12 @@ const Index = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </MetricsDashboardView>
+            </div>
           </TabsContent>
 
           <TabsContent value="logs" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
-            <LogsView>
+            <LogsView />
+            <div className="mt-4">
               <DropdownMenu>
                 <DropdownMenuTrigger className="text-white hover:text-black hover:bg-white px-3 py-1.5 rounded">
                   Log Options
@@ -162,11 +165,12 @@ const Index = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </LogsView>
+            </div>
           </TabsContent>
 
           <TabsContent value="feedback" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
-            <FeedbackAnalysisView>
+            <FeedbackAnalysisView />
+            <div className="mt-4">
               <DropdownMenu>
                 <DropdownMenuTrigger className="text-white hover:text-black hover:bg-white px-3 py-1.5 rounded">
                   Feedback Options
@@ -184,7 +188,7 @@ const Index = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </FeedbackAnalysisView>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
