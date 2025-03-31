@@ -1,9 +1,12 @@
 
 import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
-import { Cpu, Save, Download, Play } from "lucide-react";
+import { Cpu, Save, Download, Play, LogOut } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const Index = () => {
+  const { signOut } = useAuth();
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       {/* Navbar */}
@@ -24,6 +27,15 @@ const Index = () => {
           <Button size="sm" className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700">
             <Play className="h-4 w-4" />
             Run Flow
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex items-center gap-1 text-gray-400 hover:text-white"
+            onClick={() => signOut()}
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
           </Button>
         </div>
       </div>
