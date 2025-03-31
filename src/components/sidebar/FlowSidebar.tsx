@@ -1,9 +1,10 @@
+
 import { useCallback, useState } from 'react';
 import { 
   File, Pen, Code, Database, 
   MessageSquare, Terminal, Sparkles, 
   Globe, Settings, Workflow, 
-  Search, Layers, ThumbsUp
+  Search, Layers, ThumbsUp, BookOpen
 } from 'lucide-react';
 import { 
   Collapsible, 
