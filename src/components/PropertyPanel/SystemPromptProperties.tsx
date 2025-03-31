@@ -134,7 +134,7 @@ const SystemPromptProperties = ({ nodeData, onUpdateNode }: SystemPromptProperti
                   />
                 </FormControl>
                 <FormDescription className="text-gray-400">
-                  Use {{variable}} syntax for dynamic content. Available variables: {{context}}, {{query}}, {{history}}
+                  Use {'{{variable}}'} syntax for dynamic content. Available variables: {'{{context}}'}, {'{{query}}'}, {'{{history}}'}
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -150,7 +150,7 @@ const SystemPromptProperties = ({ nodeData, onUpdateNode }: SystemPromptProperti
                   <div className="space-y-0.5">
                     <FormLabel>Use Variables</FormLabel>
                     <div className="text-xs text-gray-400">
-                      Process {{variable}} placeholders
+                      Process {'{{variable}}'} placeholders
                     </div>
                   </div>
                   <FormControl>
