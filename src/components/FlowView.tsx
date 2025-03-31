@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -189,8 +190,9 @@ interface FlowViewProps {
 }
 
 const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialFlowData?.nodes?.length ? initialFlowData.nodes : initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialFlowData?.edges?.length ? initialFlowData.edges : initialEdges);
+  // Initialize with empty arrays, we'll set them from props in useEffect
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -269,10 +271,22 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     });
   }, []);
   
+  // Use effect to reset nodes and edges when initialFlowData changes
   useEffect(() => {
-    if (initialFlowData?.nodes?.length) {
-      setNodes(ensureNodeProperties(initialFlowData.nodes));
-      setEdges(initialFlowData.edges);
+    // If initialFlowData has nodes, use those, otherwise use empty arrays
+    if (initialFlowData) {
+      if (initialFlowData.nodes && initialFlowData.nodes.length > 0) {
+        setNodes(ensureNodeProperties(initialFlowData.nodes));
+        setEdges(initialFlowData.edges || []);
+      } else {
+        // This is a blank flow, reset everything
+        setNodes([]);
+        setEdges([]);
+        
+        // Also clear undo/redo stacks when starting a new flow
+        setUndoStack([]);
+        setRedoStack([]);
+      }
     }
   }, [initialFlowData, setNodes, setEdges, ensureNodeProperties]);
   

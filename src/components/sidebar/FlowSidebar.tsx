@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { 
   File, Pen, Code, Database, 
@@ -315,7 +314,8 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
   const handleTemplateSelect = useCallback((templateId: string) => {
     const templateData = templateFlows[templateId];
     if (templateData) {
-      // Always pass the template data to clear current nodes/edges
+      // Always pass the template data to the parent component
+      // This ensures blank templates clear existing nodes/edges
       onSelectTemplate(templateData.nodes, templateData.edges);
       
       toast({
@@ -337,7 +337,7 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
         }, 1000);
       }
     }
-  }, [onSelectTemplate]);
+  }, [onSelectTemplate, toast]);
 
   const handleNodeDragStart = useCallback((event: React.DragEvent, nodeType: string, nodeData: any) => {
     // Set the drag data with the node information

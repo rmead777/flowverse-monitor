@@ -14,8 +14,11 @@ const Index = () => {
   const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
 
   const handleSelectTemplate = useCallback((nodes, edges) => {
-    // This now properly sets the flow data regardless of whether it's blank or not
-    setFlowData({ nodes, edges });
+    // Directly set the flow data from the template, which will replace any existing nodes/edges
+    setFlowData({ 
+      nodes: nodes || [], 
+      edges: edges || [] 
+    });
   }, []);
 
   const handleNodeSelect = useCallback((node) => {
@@ -88,6 +91,7 @@ const Index = () => {
             <FlowView 
               onNodeSelect={handleNodeSelect} 
               initialFlowData={flowData}
+              key={JSON.stringify(flowData)} // Force re-render when flowData changes
             />
           </div>
 
