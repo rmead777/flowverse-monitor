@@ -83,7 +83,7 @@ const NodeTypeDialog = ({ isOpen, onClose, onSelectType }: NodeTypeDialogProps) 
               <RadioGroupItem
                 value={option.value}
                 id={option.value}
-                className="border-gray-700"
+                className="border-gray-700 text-white [&_svg]:text-white [&_svg]:fill-white"
               />
               <div className="grid gap-1.5">
                 <Label
