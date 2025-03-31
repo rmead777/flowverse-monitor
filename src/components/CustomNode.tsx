@@ -1,4 +1,5 @@
 
+import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 
 type MetricsType = {
@@ -42,29 +43,71 @@ const getNodeColor = (type: string) => {
   }
 };
 
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'Active';
+    case 'idle':
+      return 'Idle';
+    case 'error':
+      return 'Error';
+    default:
+      return 'Unknown';
+  }
+};
+
 const CustomNode = ({ data }: { data: NodeData }) => {
   const { label, status, type, metrics } = data;
+  const statusText = getStatusText(status);
 
   return (
-    <div className={`px-4 py-2 rounded-lg shadow-lg border-2 ${getNodeColor(type)}`}>
+    <div 
+      className={`px-4 py-3 rounded-lg shadow-lg border-2 ${getNodeColor(type)}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${label} node, type: ${type}, status: ${statusText}`}
+    >
       <div className="flex items-center justify-between mb-2">
-        <div className="text-white font-bold">{label}</div>
-        <div className={`h-3 w-3 rounded-full ${getStatusColor(status)}`} title={status} />
+        <div className="text-white font-bold text-sm sm:text-base">{label}</div>
+        <div 
+          className={`h-3 w-3 rounded-full ${getStatusColor(status)}`} 
+          title={statusText}
+          aria-label={`Status: ${statusText}`}
+        />
       </div>
-      <div className="text-xs text-gray-300">
-        <div>Tasks: {metrics.tasksProcessed}</div>
-        <div>Error rate: {(metrics.errorRate * 100).toFixed(1)}%</div>
-        <div>Latency: {metrics.latency}ms</div>
+      <div className="text-xs text-gray-300 space-y-1">
+        <div className="flex justify-between">
+          <span>Tasks:</span> 
+          <span className="font-medium">{metrics.tasksProcessed}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Error rate:</span> 
+          <span className="font-medium">{(metrics.errorRate * 100).toFixed(1)}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Latency:</span> 
+          <span className="font-medium">{metrics.latency}ms</span>
+        </div>
       </div>
       
       {type !== 'input' && (
-        <Handle type="target" position={Position.Top} className="w-3 h-3" />
+        <Handle 
+          type="target" 
+          position={Position.Top} 
+          className="w-3 h-3" 
+          aria-label="Input connection"
+        />
       )}
       {type !== 'output' && (
-        <Handle type="source" position={Position.Bottom} className="w-3 h-3" />
+        <Handle 
+          type="source" 
+          position={Position.Bottom} 
+          className="w-3 h-3" 
+          aria-label="Output connection"
+        />
       )}
     </div>
   );
 };
 
-export default CustomNode;
+export default memo(CustomNode);

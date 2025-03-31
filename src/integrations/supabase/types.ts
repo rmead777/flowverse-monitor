@@ -9,6 +9,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_logs: {
+        Row: {
+          agent_name: string
+          details: Json | null
+          event_type: string
+          id: string
+          timestamp: string
+        }
+        Insert: {
+          agent_name: string
+          details?: Json | null
+          event_type: string
+          id?: string
+          timestamp?: string
+        }
+        Update: {
+          agent_name?: string
+          details?: Json | null
+          event_type?: string
+          id?: string
+          timestamp?: string
+        }
+        Relationships: []
+      }
+      agent_metrics: {
+        Row: {
+          agent_id: string
+          error_count: number
+          id: string
+          latency: number
+          task_count: number
+          timestamp: string
+        }
+        Insert: {
+          agent_id: string
+          error_count?: number
+          id?: string
+          latency?: number
+          task_count?: number
+          timestamp?: string
+        }
+        Update: {
+          agent_id?: string
+          error_count?: number
+          id?: string
+          latency?: number
+          task_count?: number
+          timestamp?: string
+        }
+        Relationships: []
+      }
+      flow_configurations: {
+        Row: {
+          created_at: string
+          description: string | null
+          edges: Json
+          id: string
+          name: string
+          nodes: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          edges: Json
+          id?: string
+          name: string
+          nodes: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          edges?: Json
+          id?: string
+          name?: string
+          nodes?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
