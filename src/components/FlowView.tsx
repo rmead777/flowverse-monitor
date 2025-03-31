@@ -32,7 +32,9 @@ const initialNodes = [
     data: { 
       label: 'User Input',
       status: 'active',
-      type: 'input',
+      type: 'userInput',
+      inputType: 'text',
+      preprocessing: 'none',
       metrics: {
         tasksProcessed: 126,
         errorRate: 0.02,
@@ -47,7 +49,9 @@ const initialNodes = [
     data: { 
       label: 'Content Filter',
       status: 'active',
-      type: 'process',
+      type: 'action',
+      actionType: 'transform',
+      actionParams: '{"filter": "profanity", "level": "strict"}',
       metrics: {
         tasksProcessed: 126,
         errorRate: 0.01,
@@ -62,7 +66,10 @@ const initialNodes = [
     data: { 
       label: 'GPT-4 Analysis',
       status: 'active',
-      type: 'ai',
+      type: 'aiResponse',
+      model: 'gpt-4o',
+      temperature: 0.7,
+      maxTokens: 1024,
       metrics: {
         tasksProcessed: 124,
         errorRate: 0.00,
@@ -77,7 +84,9 @@ const initialNodes = [
     data: { 
       label: 'Action Generator',
       status: 'error',
-      type: 'process',
+      type: 'action',
+      actionType: 'analyze',
+      actionParams: '{"output": "suggestions", "format": "json"}',
       metrics: {
         tasksProcessed: 118,
         errorRate: 0.05,
@@ -92,7 +101,9 @@ const initialNodes = [
     data: { 
       label: 'Response Formatter',
       status: 'idle',
-      type: 'output',
+      type: 'configuration',
+      configType: 'outputFormat',
+      configParams: '{"format": "markdown", "includeMetadata": true}',
       metrics: {
         tasksProcessed: 118,
         errorRate: 0.00,
@@ -191,12 +202,79 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const reactFlowInstance = useReactFlow();
   const flowWrapper = useRef(null);
   
+  const ensureNodeProperties = useCallback((nodes: Node[]) => {
+    return nodes.map(node => {
+      const data = node.data || {};
+      
+      if (!data.type) {
+        if (node.type === 'input' || data.inputType !== undefined) {
+          data.type = 'userInput';
+        } else if (node.type === 'output' || data.model !== undefined) {
+          data.type = 'aiResponse';
+        } else if (data.prompt !== undefined) {
+          data.type = 'systemPrompt';
+        } else if (data.actionType !== undefined) {
+          data.type = 'action';
+        } else if (data.endpoint !== undefined) {
+          data.type = 'apiCall';
+        } else if (data.configType !== undefined) {
+          data.type = 'configuration';
+        }
+      }
+      
+      switch (data.type) {
+        case 'userInput':
+          if (!data.inputType) data.inputType = 'text';
+          if (!data.preprocessing) data.preprocessing = 'none';
+          break;
+        case 'aiResponse':
+          if (!data.model) data.model = 'gpt-4o';
+          if (data.temperature === undefined) data.temperature = 0.7;
+          if (!data.maxTokens) data.maxTokens = 1024;
+          break;
+        case 'systemPrompt':
+          if (!data.prompt) data.prompt = '';
+          break;
+        case 'action':
+          if (!data.actionType) data.actionType = 'transform';
+          if (!data.actionParams) data.actionParams = '{}';
+          break;
+        case 'apiCall':
+          if (!data.endpoint) data.endpoint = '';
+          if (!data.method) data.method = 'GET';
+          if (!data.headers) data.headers = '{}';
+          break;
+        case 'configuration':
+          if (!data.configType) data.configType = 'outputFormat';
+          if (!data.configParams) data.configParams = '{}';
+          break;
+      }
+      
+      if (!data.metrics) {
+        data.metrics = {
+          tasksProcessed: 0,
+          errorRate: 0,
+          latency: 0
+        };
+      }
+      
+      if (!data.status) {
+        data.status = 'idle';
+      }
+      
+      return {
+        ...node,
+        data
+      };
+    });
+  }, []);
+  
   useEffect(() => {
     if (initialFlowData?.nodes?.length) {
-      setNodes(initialFlowData.nodes);
+      setNodes(ensureNodeProperties(initialFlowData.nodes));
       setEdges(initialFlowData.edges);
     }
-  }, [initialFlowData, setNodes, setEdges]);
+  }, [initialFlowData, setNodes, setEdges, ensureNodeProperties]);
   
   useEffect(() => {
     if (user) {
@@ -269,11 +347,12 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   }, [undoStack, redoStack, nodes, edges, setNodes, setEdges]);
 
   const onNodeClick = useCallback((event, node) => {
-    setSelectedNode(node);
+    const enhancedNode = ensureNodeProperties([node])[0];
+    setSelectedNode(enhancedNode);
     if (onNodeSelect) {
-      onNodeSelect(node);
+      onNodeSelect(enhancedNode);
     }
-  }, [onNodeSelect]);
+  }, [onNodeSelect, ensureNodeProperties]);
 
   const closeNodeDetails = useCallback(() => {
     setSelectedNode(null);
@@ -488,9 +567,12 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
         const { error } = await supabase
           .from('agent_logs')
           .insert([{
-            agent_name: 'New Node',
+            agent_name: newNode.data.label,
             event_type: 'node_created',
-            details: { node_id: newNode.id } as Json
+            details: { 
+              node_id: newNode.id,
+              node_type: newNode.data.type
+            } as Json
           }]);
           
         if (error) console.error('Error logging node creation:', error);
@@ -753,7 +835,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-red-500 border-gray-300"
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
                   onClick={deleteSelectedNodes}
                   aria-label="Delete Selected"
                   disabled={!nodes.some(node => node.selected)}
