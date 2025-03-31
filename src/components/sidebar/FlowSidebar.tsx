@@ -4,7 +4,8 @@ import {
   File, Pen, Code, Database, 
   MessageSquare, Terminal, Sparkles, 
   Globe, Settings, Workflow, 
-  Search, Layers, ThumbsUp, BookOpen
+  Search, Layers, ThumbsUp, BookOpen,
+  ChevronDown
 } from 'lucide-react';
 import { 
   Collapsible, 
@@ -442,6 +443,7 @@ interface FlowSidebarProps {
 
 const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
   const { setNodes } = useReactFlow();
+  const [gettingStartedOpen, setGettingStartedOpen] = useState(true);
 
   const handleTemplateSelect = useCallback((templateId: string) => {
     const templateData = templateFlows[templateId];
@@ -519,20 +521,29 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
 
   return (
     <div className="w-48 bg-gray-950 border-r border-gray-800 overflow-y-auto h-full flex flex-col">
-      <div className="p-4 border-b border-gray-800">
-        <h2 className="text-sm font-semibold text-white mb-3">Getting Started</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {templates.map((template) => (
-            <TemplateCard
-              key={template.id}
-              title={template.title}
-              description={template.description}
-              icon={template.icon}
-              onClick={() => handleTemplateSelect(template.id)}
-            />
-          ))}
-        </div>
-      </div>
+      <Collapsible 
+        open={gettingStartedOpen} 
+        onOpenChange={setGettingStartedOpen}
+        className="border-b border-gray-800"
+      >
+        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 text-sm font-semibold text-white">
+          Getting Started
+          <ChevronDown className={`h-4 w-4 transition-transform ${gettingStartedOpen ? '' : '-rotate-90'}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="p-4 pt-0">
+          <div className="grid grid-cols-2 gap-2">
+            {templates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                title={template.title}
+                description={template.description}
+                icon={template.icon}
+                onClick={() => handleTemplateSelect(template.id)}
+              />
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="p-4 flex-1">
         <h2 className="text-sm font-semibold text-white mb-3">Node Types</h2>
