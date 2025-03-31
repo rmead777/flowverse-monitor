@@ -78,25 +78,25 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <FlowSidebar onSelectTemplate={handleSelectTemplate} />
+        <ReactFlowProvider>
+          {/* Left Sidebar */}
+          <FlowSidebar onSelectTemplate={handleSelectTemplate} />
 
-        {/* Flow View */}
-        <div className="flex-1 overflow-hidden bg-gray-950">
-          <ReactFlowProvider>
+          {/* Flow View */}
+          <div className="flex-1 overflow-hidden bg-gray-950">
             <FlowView 
               onNodeSelect={handleNodeSelect} 
               initialFlowData={flowData}
             />
-          </ReactFlowProvider>
-        </div>
+          </div>
 
-        {/* Properties Panel */}
-        <PropertyPanel 
-          selectedNode={selectedNode} 
-          onUpdateNode={handleNodeUpdate}
-          onClose={() => setSelectedNode(null)}
-        />
+          {/* Properties Panel */}
+          <PropertyPanel 
+            selectedNode={selectedNode} 
+            onUpdateNode={handleNodeUpdate}
+            onClose={() => setSelectedNode(null)}
+          />
+        </ReactFlowProvider>
       </div>
 
       {/* Status Bar */}
