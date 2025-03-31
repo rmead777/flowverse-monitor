@@ -3,8 +3,7 @@ import {
   File, Pen, Code, Database, 
   MessageSquare, Terminal, Sparkles, 
   Globe, Settings, Workflow, 
-  Search, Layers, ThumbsUp, 
-  BookOpen, BarChart2, FileText
+  Search, Layers, ThumbsUp
 } from 'lucide-react';
 import { 
   Collapsible, 
@@ -12,16 +11,11 @@ import {
   CollapsibleTrigger 
 } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { useReactFlow } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 import TemplateCard from './TemplateCard';
 import NodeTypeItem from './NodeTypeItem';
-import KnowledgeBaseItem from './KnowledgeBaseItem';
 
 const templates = [
   {
@@ -139,33 +133,6 @@ const nodeTypes = [
         color: '#fbbf24' // Yellow
       }
     ]
-  }
-];
-
-const knowledgeBases = [
-  {
-    id: '1',
-    name: 'Technical Documentation',
-    type: 'Pinecone',
-    status: 'active',
-    documentCount: 248,
-    lastUpdated: '2023-06-10'
-  },
-  {
-    id: '2',
-    name: 'Product Manuals',
-    type: 'Weaviate',
-    status: 'active',
-    documentCount: 112,
-    lastUpdated: '2023-07-01'
-  },
-  {
-    id: '3',
-    name: 'Customer Support',
-    type: 'Supabase',
-    status: 'indexing',
-    documentCount: 503,
-    lastUpdated: '2023-07-12'
   }
 ];
 
@@ -474,16 +441,6 @@ interface FlowSidebarProps {
 
 const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
   const { setNodes } = useReactFlow();
-  const [showAddKbDialog, setShowAddKbDialog] = useState(false);
-  const [showKbDetailsDialog, setShowKbDetailsDialog] = useState(false);
-  const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(null);
-  const [newKbData, setNewKbData] = useState({
-    name: '',
-    type: 'pinecone',
-    apiKey: '',
-    environment: '',
-    namespace: ''
-  });
 
   const handleTemplateSelect = useCallback((templateId: string) => {
     const templateData = templateFlows[templateId];
@@ -559,94 +516,6 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
     }
   };
 
-  const handleAddKnowledgeBase = () => {
-    toast({
-      title: 'Knowledge Base Added',
-      description: `"${newKbData.name}" has been successfully added.`
-    });
-    setShowAddKbDialog(false);
-    setNewKbData({
-      name: '',
-      type: 'pinecone',
-      apiKey: '',
-      environment: '',
-      namespace: ''
-    });
-  };
-
-  const handleViewKnowledgeBase = (kb: any) => {
-    setSelectedKnowledgeBase(kb);
-    setShowKbDetailsDialog(true);
-  };
-
-  const getDynamicKbFields = () => {
-    switch (newKbData.type) {
-      case 'pinecone':
-        return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="environment">Environment</Label>
-              <Input 
-                id="environment" 
-                value={newKbData.environment}
-                onChange={(e) => setNewKbData({...newKbData, environment: e.target.value})}
-                className="bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="namespace">Namespace (optional)</Label>
-              <Input 
-                id="namespace" 
-                value={newKbData.namespace}
-                onChange={(e) => setNewKbData({...newKbData, namespace: e.target.value})}
-                className="bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
-          </>
-        );
-      case 'weaviate':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="url">Weaviate URL</Label>
-            <Input 
-              id="url" 
-              value={newKbData.environment}
-              onChange={(e) => setNewKbData({...newKbData, environment: e.target.value})}
-              className="bg-gray-800 border-gray-700 text-white"
-              placeholder="https://instance.weaviate.network"
-            />
-          </div>
-        );
-      case 'supabase':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="url">Project URL</Label>
-            <Input 
-              id="url" 
-              value={newKbData.environment}
-              onChange={(e) => setNewKbData({...newKbData, environment: e.target.value})}
-              className="bg-gray-800 border-gray-700 text-white"
-              placeholder="https://project.supabase.co"
-            />
-          </div>
-        );
-      case 'google':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="customSearch">Search Engine ID</Label>
-            <Input 
-              id="customSearch" 
-              value={newKbData.environment}
-              onChange={(e) => setNewKbData({...newKbData, environment: e.target.value})}
-              className="bg-gray-800 border-gray-700 text-white"
-            />
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="w-48 bg-gray-950 border-r border-gray-800 overflow-y-auto h-full flex flex-col">
       <div className="p-4 border-b border-gray-800">
@@ -664,7 +533,7 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
         </div>
       </div>
 
-      <div className="p-4 border-b border-gray-800 flex-1">
+      <div className="p-4 flex-1">
         <h2 className="text-sm font-semibold text-white mb-3">Node Types</h2>
         <div className="space-y-4">
           {nodeTypes.map((category) => (
@@ -688,151 +557,6 @@ const FlowSidebar = ({ onSelectTemplate }: FlowSidebarProps) => {
           ))}
         </div>
       </div>
-
-      <div className="p-4 border-b border-gray-800">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-white">Knowledge Bases</h2>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-7 px-2 bg-indigo-600 hover:bg-indigo-700 border-indigo-500 text-white"
-            onClick={() => setShowAddKbDialog(true)}
-          >
-            Add
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {knowledgeBases.map((kb) => (
-            <KnowledgeBaseItem
-              key={kb.id}
-              name={kb.name}
-              type={kb.type}
-              status={kb.status}
-              onClick={() => handleViewKnowledgeBase(kb)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="p-4">
-        <h2 className="text-sm font-semibold text-white mb-3">Views</h2>
-        <div className="space-y-2">
-          <button className="flex items-center space-x-2 w-full p-2 text-left text-sm rounded-md text-gray-300 hover:bg-gray-800 hover:text-white">
-            <BarChart2 className="h-4 w-4" />
-            <span>Metrics Dashboard</span>
-          </button>
-          <button className="flex items-center space-x-2 w-full p-2 text-left text-sm rounded-md text-gray-300 hover:bg-gray-800 hover:text-white">
-            <ThumbsUp className="h-4 w-4" />
-            <span>Feedback Analysis</span>
-          </button>
-          <button className="flex items-center space-x-2 w-full p-2 text-left text-sm rounded-md text-gray-300 hover:bg-gray-800 hover:text-white">
-            <FileText className="h-4 w-4" />
-            <span>Logs</span>
-          </button>
-        </div>
-      </div>
-
-      <Dialog open={showAddKbDialog} onOpenChange={setShowAddKbDialog}>
-        <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-800 text-white">
-          <DialogHeader>
-            <DialogTitle>Add Knowledge Base</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input 
-                id="name" 
-                value={newKbData.name}
-                onChange={(e) => setNewKbData({...newKbData, name: e.target.value})}
-                className="bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Select 
-                value={newKbData.type} 
-                onValueChange={(value) => setNewKbData({...newKbData, type: value})}
-              >
-                <SelectTrigger id="type" className="bg-gray-800 border-gray-700 text-white">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                  <SelectItem value="pinecone">Pinecone</SelectItem>
-                  <SelectItem value="weaviate">Weaviate</SelectItem>
-                  <SelectItem value="supabase">Supabase</SelectItem>
-                  <SelectItem value="google">Google Search API</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input 
-                id="apiKey" 
-                type="password"
-                value={newKbData.apiKey}
-                onChange={(e) => setNewKbData({...newKbData, apiKey: e.target.value})}
-                className="bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
-            {getDynamicKbFields()}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddKbDialog(false)} className="border-gray-700 text-gray-300">
-              Cancel
-            </Button>
-            <Button onClick={handleAddKnowledgeBase} className="bg-indigo-600 hover:bg-indigo-700">
-              Add Knowledge Base
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {selectedKnowledgeBase && (
-        <Dialog open={showKbDetailsDialog} onOpenChange={setShowKbDetailsDialog}>
-          <DialogContent className="sm:max-w-[600px] bg-gray-900 border-gray-800 text-white">
-            <DialogHeader>
-              <DialogTitle>{selectedKnowledgeBase.name}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Type</span>
-                  <p className="text-white">{selectedKnowledgeBase.type}</p>
-                </div>
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Status</span>
-                  <p className="text-white capitalize">{selectedKnowledgeBase.status}</p>
-                </div>
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Documents</span>
-                  <p className="text-white">{selectedKnowledgeBase.documentCount}</p>
-                </div>
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Last Updated</span>
-                  <p className="text-white">{selectedKnowledgeBase.lastUpdated}</p>
-                </div>
-              </div>
-              
-              <div className="border-t border-gray-800 pt-4">
-                <h3 className="text-sm font-semibold mb-2">Documents</h3>
-                <div className="border-2 border-dashed border-gray-700 p-6 rounded-md text-center">
-                  <p className="text-gray-400">Drag and drop PDFs or text files here</p>
-                  <p className="text-gray-500 text-xs mt-1">or</p>
-                  <Button className="mt-2 bg-indigo-600 hover:bg-indigo-700">Upload Files</Button>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowKbDetailsDialog(false)} className="border-gray-700 text-gray-300">
-                Close
-              </Button>
-              <Button className="bg-indigo-600 hover:bg-indigo-700">
-                Update
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };
