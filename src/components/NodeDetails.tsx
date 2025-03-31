@@ -9,12 +9,15 @@ import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Custom type for JSON data
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 // Define types for our database tables
 type AgentLogsType = {
   id: string;
   agent_name: string;
   event_type: string;
-  details: any;
+  details: Json;
   timestamp: string;
 }
 
@@ -66,7 +69,7 @@ const NodeDetails = ({ node, onClose, onMetricsUpdate }) => {
           details: { 
             node_id: node.id,
             previous_status: data.status 
-          }
+          } as Json
         }]) as { error: any };
       
       // Update the status
@@ -106,7 +109,7 @@ const NodeDetails = ({ node, onClose, onMetricsUpdate }) => {
             node_id: node.id,
             previous_config: data,
             new_config: updatedData
-          }
+          } as Json
         }]) as { error: any };
       
       // Simulate a delay for saving

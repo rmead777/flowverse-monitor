@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
 import { Cpu, Save, Download, Play, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { ReactFlowProvider } from "reactflow";
 
 const Index = () => {
   const { signOut } = useAuth();
@@ -70,7 +71,9 @@ const Index = () => {
 
         {/* Flow View */}
         <div className="flex-1 overflow-hidden bg-gray-950">
-          <FlowView />
+          <ReactFlowProvider>
+            <FlowView />
+          </ReactFlowProvider>
         </div>
       </div>
 

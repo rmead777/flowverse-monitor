@@ -113,14 +113,17 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
+// Custom type for JSON data
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 // Typing for our database tables
 type FlowConfigurationType = {
   id: string;
   user_id: string;
   name: string;
   description: string | null;
-  nodes: any;
-  edges: any;
+  nodes: Json;
+  edges: Json;
   created_at: string;
   updated_at: string;
 }
@@ -138,7 +141,7 @@ type AgentLogsType = {
   id: string;
   agent_name: string;
   event_type: string;
-  details: any;
+  details: Json;
   timestamp: string;
 }
 
@@ -269,8 +272,8 @@ const FlowView = () => {
         user_id: user.id,
         name,
         description,
-        nodes: nodes,
-        edges: edges,
+        nodes: JSON.parse(JSON.stringify(nodes)) as Json,
+        edges: JSON.parse(JSON.stringify(edges)) as Json,
       };
       
       const { error } = await supabase
@@ -457,7 +460,7 @@ const FlowView = () => {
           .insert([{
             agent_name: 'New Node',
             event_type: 'node_created',
-            details: { node_id: newNode.id }
+            details: { node_id: newNode.id } as Json
           }]) as { error: any };
           
         if (error) console.error('Error logging node creation:', error);
