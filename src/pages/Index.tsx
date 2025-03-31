@@ -12,6 +12,9 @@ import KnowledgeBaseView from "@/components/views/KnowledgeBaseView";
 import MetricsDashboardView from "@/components/views/MetricsDashboardView";
 import FeedbackAnalysisView from "@/components/views/FeedbackAnalysisView";
 import LogsView from "@/components/views/LogsView";
+import SaveFlowDialog from "@/components/SaveFlowDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -20,10 +23,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const Index = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [selectedNode, setSelectedNode] = useState(null);
   const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
   const [activeTab, setActiveTab] = useState("flow");
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [flowConfigurations, setFlowConfigurations] = useState([]);
+  const { toast } = useToast();
 
   const handleSelectTemplate = useCallback((nodes, edges) => {
     setFlowData({ 
@@ -47,6 +54,73 @@ const Index = () => {
     }));
   }, [selectedNode]);
 
+  const fetchFlowConfigurations = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('flow_configurations')
+        .select('*')
+        .order('updated_at', { ascending: false });
+        
+      if (error) throw error;
+      setFlowConfigurations(data || []);
+    } catch (error) {
+      console.error('Error fetching flow configurations:', error);
+      toast({
+        title: 'Error fetching saved flows',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }, [user, toast]);
+
+  const saveFlow = useCallback(async (name, description) => {
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in to save flow configurations',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const flowDataToSave = {
+        user_id: user.id,
+        name,
+        description,
+        nodes: flowData.nodes,
+        edges: flowData.edges,
+      };
+      
+      const { error } = await supabase
+        .from('flow_configurations')
+        .insert([flowDataToSave]);
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Flow saved successfully',
+        description: `Flow "${name}" has been saved to your account`,
+      });
+      
+      fetchFlowConfigurations();
+    } catch (error) {
+      console.error('Error saving flow:', error);
+      toast({
+        title: 'Error saving flow',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+      setIsSaveDialogOpen(false);
+    }
+  }, [user, flowData, toast, fetchFlowConfigurations]);
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="border-b border-gray-800 p-4 flex justify-between items-center">
@@ -59,6 +133,8 @@ const Index = () => {
             variant="outline" 
             size="sm" 
             className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white border-blue-500"
+            onClick={() => setIsSaveDialogOpen(true)}
+            disabled={isLoading || !user}
           >
             <Save className="h-4 w-4" />
             Save
@@ -203,6 +279,14 @@ const Index = () => {
         <div>5 agents active</div>
         <div>Last update: {new Date().toLocaleTimeString()}</div>
       </div>
+
+      <SaveFlowDialog
+        isOpen={isSaveDialogOpen}
+        onClose={() => setIsSaveDialogOpen(false)}
+        onSave={saveFlow}
+        isLoading={isLoading}
+        existingFlows={flowConfigurations}
+      />
     </div>
   );
 };
