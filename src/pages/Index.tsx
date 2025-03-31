@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
@@ -96,33 +95,32 @@ const Index = () => {
             <TabsTrigger value="feedback" className="data-[state=active]:bg-indigo-600">Feedback Analysis</TabsTrigger>
             <TabsTrigger value="logs" className="data-[state=active]:bg-indigo-600">Logs</TabsTrigger>
           </TabsList>
-        </Tabs>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        <ReactFlowProvider>
+          {/* TabsContent for flow (includes ReactFlowProvider) */}
           <TabsContent value="flow" className="flex flex-1 overflow-hidden m-0 data-[state=inactive]:hidden">
-            {/* Left Sidebar */}
-            <FlowSidebar onSelectTemplate={handleSelectTemplate} />
+            <ReactFlowProvider>
+              {/* Left Sidebar */}
+              <FlowSidebar onSelectTemplate={handleSelectTemplate} />
 
-            {/* Flow View */}
-            <div className="flex-1 overflow-hidden bg-gray-950">
-              <FlowView 
-                onNodeSelect={handleNodeSelect} 
-                initialFlowData={flowData}
-                key={JSON.stringify(flowData)} // Force re-render when flowData changes
+              {/* Flow View */}
+              <div className="flex-1 overflow-hidden bg-gray-950">
+                <FlowView 
+                  onNodeSelect={handleNodeSelect} 
+                  initialFlowData={flowData}
+                  key={JSON.stringify(flowData)} // Force re-render when flowData changes
+                />
+              </div>
+
+              {/* Properties Panel */}
+              <PropertyPanel 
+                selectedNode={selectedNode} 
+                onUpdateNode={handleNodeUpdate}
+                onClose={() => setSelectedNode(null)}
               />
-            </div>
-
-            {/* Properties Panel */}
-            <PropertyPanel 
-              selectedNode={selectedNode} 
-              onUpdateNode={handleNodeUpdate}
-              onClose={() => setSelectedNode(null)}
-            />
+            </ReactFlowProvider>
           </TabsContent>
 
+          {/* Other TabsContent elements without ReactFlowProvider */}
           <TabsContent value="kb" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
             <KnowledgeBaseView />
           </TabsContent>
@@ -138,7 +136,12 @@ const Index = () => {
           <TabsContent value="logs" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
             <LogsView />
           </TabsContent>
-        </ReactFlowProvider>
+        </Tabs>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* The actual content is rendered in TabsContent above */}
       </div>
 
       {/* Status Bar */}
