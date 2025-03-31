@@ -4,6 +4,9 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NodeDetails from './NodeDetailsInline';
 import RankerNodeProperties from './RankerNodeProperties';
+import AINodeProperties from './AINodeProperties';
+import RetrieverNodeProperties from './RetrieverNodeProperties';
+import SystemPromptProperties from './SystemPromptProperties';
 
 interface PropertyPanelProps {
   selectedNode: any;
@@ -27,54 +30,24 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
         );
       case 'ai':
         return (
-          <div className="space-y-4">
-            <div className="text-lg font-semibold text-white mb-4">AI Node Properties</div>
-            <NodeDetails 
-              node={selectedNode} 
-              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
-            />
-            {/* AI-specific properties would go here */}
-            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
-              <h3 className="text-sm font-medium text-gray-300 mb-2">AI Model Configuration</h3>
-              <div className="text-xs text-gray-400">
-                Note: AI model configuration options will be implemented in a future update.
-              </div>
-            </div>
-          </div>
+          <AINodeProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
         );
       case 'retriever':
         return (
-          <div className="space-y-4">
-            <div className="text-lg font-semibold text-white mb-4">Retriever Node Properties</div>
-            <NodeDetails 
-              node={selectedNode} 
-              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
-            />
-            {/* Retriever-specific properties would go here */}
-            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
-              <h3 className="text-sm font-medium text-gray-300 mb-2">Vector Database Settings</h3>
-              <div className="text-xs text-gray-400">
-                Note: Vector database configuration options will be implemented in a future update.
-              </div>
-            </div>
-          </div>
+          <RetrieverNodeProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
         );
       case 'systemPrompt':
         return (
-          <div className="space-y-4">
-            <div className="text-lg font-semibold text-white mb-4">System Prompt Properties</div>
-            <NodeDetails 
-              node={selectedNode} 
-              onMetricsUpdate={(updatedData) => onUpdateNode(updatedData)} 
-            />
-            {/* System Prompt-specific properties would go here */}
-            <div className="p-3 border border-gray-700 rounded-md bg-gray-800 mt-4">
-              <h3 className="text-sm font-medium text-gray-300 mb-2">Prompt Template</h3>
-              <div className="text-xs text-gray-400">
-                Note: Prompt template configuration will be implemented in a future update.
-              </div>
-            </div>
-          </div>
+          <SystemPromptProperties
+            nodeData={selectedNode.data}
+            onUpdateNode={(updatedData) => onUpdateNode(updatedData)}
+          />
         );
       default:
         return (
