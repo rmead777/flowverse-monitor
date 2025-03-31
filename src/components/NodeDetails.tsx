@@ -9,6 +9,15 @@ import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define types for our database tables
+type AgentLogsType = {
+  id: string;
+  agent_name: string;
+  event_type: string;
+  details: any;
+  timestamp: string;
+}
+
 const NodeDetails = ({ node, onClose, onMetricsUpdate }) => {
   const { data } = node;
   const [isUpdating, setIsUpdating] = useState(false);
@@ -58,7 +67,7 @@ const NodeDetails = ({ node, onClose, onMetricsUpdate }) => {
             node_id: node.id,
             previous_status: data.status 
           }
-        }]);
+        }]) as { error: any };
       
       // Update the status
       handleStatusChange('active');
@@ -98,7 +107,7 @@ const NodeDetails = ({ node, onClose, onMetricsUpdate }) => {
             previous_config: data,
             new_config: updatedData
           }
-        }]);
+        }]) as { error: any };
       
       // Simulate a delay for saving
       setTimeout(() => {

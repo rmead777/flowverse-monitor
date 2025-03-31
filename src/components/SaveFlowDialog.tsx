@@ -7,12 +7,24 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Loader } from 'lucide-react';
 
+// Define types for our database tables
+type FlowConfigurationType = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  nodes: any;
+  edges: any;
+  created_at: string;
+  updated_at: string;
+}
+
 interface SaveFlowDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (name: string, description: string) => void;
   isLoading: boolean;
-  existingFlows: any[];
+  existingFlows: FlowConfigurationType[];
 }
 
 const SaveFlowDialog = ({ isOpen, onClose, onSave, isLoading, existingFlows }: SaveFlowDialogProps) => {

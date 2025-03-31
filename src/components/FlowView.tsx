@@ -114,13 +114,42 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
+// Typing for our database tables
+type FlowConfigurationType = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  nodes: any;
+  edges: any;
+  created_at: string;
+  updated_at: string;
+}
+
+type AgentMetricsType = {
+  id: string;
+  agent_id: string;
+  task_count: number;
+  error_count: number;
+  latency: number;
+  timestamp: string;
+}
+
+type AgentLogsType = {
+  id: string;
+  agent_name: string;
+  event_type: string;
+  details: any;
+  timestamp: string;
+}
+
 const FlowView = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [flowConfigurations, setFlowConfigurations] = useState([]);
+  const [flowConfigurations, setFlowConfigurations] = useState<FlowConfigurationType[]>([]);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const { toast } = useToast();
@@ -142,7 +171,7 @@ const FlowView = () => {
       const { data, error } = await supabase
         .from('flow_configurations')
         .select('*')
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false }) as { data: FlowConfigurationType[] | null; error: any };
         
       if (error) throw error;
       setFlowConfigurations(data || []);
@@ -241,13 +270,13 @@ const FlowView = () => {
         user_id: user.id,
         name,
         description,
-        nodes: JSON.parse(JSON.stringify(nodes)),
-        edges: JSON.parse(JSON.stringify(edges)),
+        nodes: nodes,
+        edges: edges,
       };
       
       const { error } = await supabase
         .from('flow_configurations')
-        .insert([flowData]);
+        .insert([flowData]) as { error: any };
         
       if (error) throw error;
       
@@ -279,7 +308,7 @@ const FlowView = () => {
         .from('flow_configurations')
         .select('*')
         .eq('id', id)
-        .single();
+        .single() as { data: FlowConfigurationType | null; error: any };
         
       if (error) throw error;
       
@@ -343,19 +372,22 @@ const FlowView = () => {
       
       reader.onload = (e) => {
         try {
-          const importedData = JSON.parse(e.target.result);
-          
-          if (importedData.nodes && importedData.edges) {
-            saveToUndoHistory();
-            setNodes(importedData.nodes);
-            setEdges(importedData.edges);
+          const result = e.target?.result;
+          if (typeof result === 'string') {
+            const importedData = JSON.parse(result);
             
-            toast({
-              title: 'Flow imported successfully',
-              description: 'Your flow has been imported from the JSON file',
-            });
-          } else {
-            throw new Error('Invalid flow configuration format');
+            if (importedData.nodes && importedData.edges) {
+              saveToUndoHistory();
+              setNodes(importedData.nodes);
+              setEdges(importedData.edges);
+              
+              toast({
+                title: 'Flow imported successfully',
+                description: 'Your flow has been imported from the JSON file',
+              });
+            } else {
+              throw new Error('Invalid flow configuration format');
+            }
           }
         } catch (error) {
           console.error('Error importing flow:', error);
@@ -386,7 +418,7 @@ const FlowView = () => {
           task_count: node.data.metrics.tasksProcessed,
           error_count: Math.round(node.data.metrics.tasksProcessed * node.data.metrics.errorRate),
           latency: node.data.metrics.latency
-        }]);
+        }]) as { error: any };
         
       if (error) throw error;
       
@@ -426,7 +458,7 @@ const FlowView = () => {
         agent_name: 'New Node',
         event_type: 'node_created',
         details: { node_id: newNode.id }
-      }])
+      }]) as { error: any }
       .then(({ error }) => {
         if (error) console.error('Error logging node creation:', error);
       });
