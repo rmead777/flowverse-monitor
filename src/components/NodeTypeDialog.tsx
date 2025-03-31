@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-export type NodeType = 'userInput' | 'systemPrompt' | 'aiResponse' | 'action' | 'apiCall' | 'configuration' | 'process';
+export type NodeType = 'userInput' | 'systemPrompt' | 'aiResponse' | 'action' | 'apiCall' | 'configuration' | 'process' | 'retriever' | 'contextManager' | 'feedback';
 
 interface NodeTypeOption {
   value: NodeType;
@@ -28,6 +28,21 @@ const nodeTypeOptions: NodeTypeOption[] = [
     value: 'aiResponse',
     label: 'AI Response',
     description: 'Generates AI output based on input.'
+  },
+  {
+    value: 'retriever',
+    label: 'Retriever',
+    description: 'Fetches relevant documents from knowledge bases.'
+  },
+  {
+    value: 'contextManager',
+    label: 'Context Manager',
+    description: 'Manages conversation context and history.'
+  },
+  {
+    value: 'feedback',
+    label: 'Feedback',
+    description: 'Collects and processes user feedback.'
   },
   {
     value: 'action',

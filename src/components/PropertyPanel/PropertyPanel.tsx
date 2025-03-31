@@ -7,8 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { X } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 interface PropertyPanelProps {
   selectedNode: any;
@@ -19,6 +22,11 @@ interface PropertyPanelProps {
 const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelProps) => {
   const [nodeData, setNodeData] = useState<any>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showTestQuery, setShowTestQuery] = useState(false);
+  const [queryInput, setQueryInput] = useState('');
+  const [testResults, setTestResults] = useState<any[]>([]);
+  const [showContextView, setShowContextView] = useState(false);
+  const [contextMessages, setContextMessages] = useState<any[]>([]);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -44,13 +52,20 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
   };
 
   const handleMetricsChange = (field: string, value: any) => {
-    setNodeData((prev: any) => ({
-      ...prev,
-      metrics: {
-        ...prev.metrics,
-        [field]: value
-      }
-    }));
+    setNodeData((prev: any) => {
+      // Handle different metric structures for different node types
+      const effectiveType = getNodeType();
+      let metricsField = 'metrics';
+      
+      // Update the appropriate metrics field based on node type
+      const updatedMetrics = { ...(prev.metrics || {}) };
+      updatedMetrics[field] = value;
+      
+      return {
+        ...prev,
+        metrics: updatedMetrics
+      };
+    });
     
     // Clear errors for this field
     if (errors[`metrics.${field}`]) {
@@ -82,6 +97,17 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
       
       if (nodeData.maxTokens !== undefined && nodeData.maxTokens <= 0) {
         newErrors['maxTokens'] = 'Max tokens must be greater than 0';
+      }
+    }
+
+    if (nodeData.type === 'retriever') {
+      if (nodeData.numResults !== undefined && nodeData.numResults <= 0) {
+        newErrors['numResults'] = 'Number of results must be greater than 0';
+      }
+      
+      if (nodeData.similarityThreshold !== undefined && 
+          (nodeData.similarityThreshold < 0 || nodeData.similarityThreshold > 1)) {
+        newErrors['similarityThreshold'] = 'Similarity threshold must be between 0 and 1';
       }
     }
     
@@ -131,6 +157,78 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
     
     // Default case, try to use the node's visual type
     return selectedNode.type || null;
+  };
+
+  const handleTestQuery = () => {
+    if (!queryInput.trim()) {
+      toast({
+        title: 'Query Required',
+        description: 'Please enter a query to test.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Mock test results based on knowledge base
+    const mockResults = [
+      {
+        title: 'Document 1: Introduction to RAG',
+        snippet: 'Retrieval-Augmented Generation (RAG) is a technique that combines retrieval-based and generative approaches...',
+        score: 0.92,
+      },
+      {
+        title: 'Document 2: Implementing RAG with Vector Databases',
+        snippet: 'Vector databases such as Pinecone and Weaviate are commonly used for storing and retrieving document embeddings...',
+        score: 0.87,
+      },
+      {
+        title: 'Document 3: Evaluation Metrics for RAG Systems',
+        snippet: 'Common metrics for evaluating RAG systems include Precision, Recall, and Mean Reciprocal Rank (MRR)...',
+        score: 0.81,
+      },
+      {
+        title: 'Document 4: Prompt Engineering for RAG',
+        snippet: 'Effective prompt engineering is crucial for RAG systems to generate relevant and accurate responses...',
+        score: 0.78,
+      },
+      {
+        title: 'Document 5: Context Window Management',
+        snippet: 'Managing the context window is important to ensure that the most relevant information is included in the LLM input...',
+        score: 0.72,
+      }
+    ];
+
+    setTestResults(mockResults);
+    setShowTestQuery(true);
+
+    // Update metrics based on the test
+    const numRelevantResults = mockResults.filter(r => r.score > 0.8).length;
+    const recallRate = numRelevantResults / mockResults.length;
+    const retrievalLatency = Math.floor(Math.random() * 400) + 200; // Random latency between 200-600ms
+
+    setNodeData(prev => ({
+      ...prev,
+      metrics: {
+        ...prev.metrics,
+        recallRate,
+        precision: 0.85,
+        retrievalLatency
+      }
+    }));
+  };
+
+  const handleViewContext = () => {
+    // Mock context data
+    const mockContext = [
+      { role: 'user', content: 'Hello, I need information about RAG systems.' },
+      { role: 'assistant', content: 'I\'d be happy to help with information about Retrieval-Augmented Generation (RAG) systems. What specifically would you like to know?' },
+      { role: 'user', content: 'How do they work with vector databases?' },
+      { role: 'assistant', content: 'RAG systems use vector databases to store document embeddings. When a query comes in, the system converts it to a vector and searches for similar document vectors...' },
+      { role: 'user', content: 'What are the best practices for implementation?' }
+    ];
+
+    setContextMessages(mockContext);
+    setShowContextView(true);
   };
 
   const renderFieldsByType = () => {
@@ -241,6 +339,205 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
                 onChange={(e) => handleInputChange('maxTokens', parseInt(e.target.value) || 0)}
               />
               {errors.maxTokens && <p className="text-xs text-red-500">{errors.maxTokens}</p>}
+            </div>
+          </>
+        );
+        
+      case 'retriever':
+        return (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="knowledgeBase">Knowledge Base</Label>
+              <Select 
+                value={nodeData.knowledgeBase || ''} 
+                onValueChange={(value) => handleInputChange('knowledgeBase', value)}
+              >
+                <SelectTrigger id="knowledgeBase">
+                  <SelectValue placeholder="Select knowledge base" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Technical Documentation">Technical Documentation</SelectItem>
+                  <SelectItem value="Product Manuals">Product Manuals</SelectItem>
+                  <SelectItem value="Customer Support">Customer Support</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="numResults">Number of Results</Label>
+              <Input 
+                id="numResults"
+                type="number"
+                value={nodeData.numResults ?? 5}
+                onChange={(e) => handleInputChange('numResults', parseInt(e.target.value) || 0)}
+              />
+              {errors.numResults && <p className="text-xs text-red-500">{errors.numResults}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="similarityThreshold">
+                Similarity Threshold: {((nodeData.similarityThreshold ?? 0.8) * 100).toFixed(0)}%
+              </Label>
+              <Slider 
+                id="similarityThreshold"
+                value={[nodeData.similarityThreshold ?? 0.8]}
+                min={0}
+                max={1}
+                step={0.01}
+                onValueChange={(value) => handleInputChange('similarityThreshold', value[0])}
+              />
+              {errors.similarityThreshold && <p className="text-xs text-red-500">{errors.similarityThreshold}</p>}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="filters">Filters (optional)</Label>
+              <Input 
+                id="filters"
+                placeholder="E.g., 'Only documents from 2023 or later'"
+                value={nodeData.filters ?? ''}
+                onChange={(e) => handleInputChange('filters', e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="embeddingModel">Embedding Model</Label>
+              <Select 
+                value={nodeData.embeddingModel || 'text-embedding-ada-002'} 
+                onValueChange={(value) => handleInputChange('embeddingModel', value)}
+              >
+                <SelectTrigger id="embeddingModel">
+                  <SelectValue placeholder="Select embedding model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text-embedding-ada-002">OpenAI Ada 002</SelectItem>
+                  <SelectItem value="sentence-transformers">Sentence Transformers</SelectItem>
+                  <SelectItem value="huggingface-embeddings">HuggingFace Embeddings</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="mt-4">
+              <div className="flex space-x-2">
+                <Input 
+                  placeholder="Enter a test query..."
+                  value={queryInput}
+                  onChange={(e) => setQueryInput(e.target.value)}
+                />
+                <Button 
+                  onClick={handleTestQuery}
+                  className="bg-indigo-600 hover:bg-indigo-700 flex items-center gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Test
+                </Button>
+              </div>
+            </div>
+          </>
+        );
+
+      case 'contextManager':
+        return (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="contextWindow">Context Window (messages)</Label>
+              <Input 
+                id="contextWindow"
+                type="number"
+                value={nodeData.contextWindow ?? 5}
+                onChange={(e) => handleInputChange('contextWindow', parseInt(e.target.value) || 0)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="contextStorage">Storage</Label>
+              <Select 
+                value={nodeData.contextStorage || 'in-memory'} 
+                onValueChange={(value) => handleInputChange('contextStorage', value)}
+              >
+                <SelectTrigger id="contextStorage">
+                  <SelectValue placeholder="Select storage type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in-memory">In-Memory</SelectItem>
+                  <SelectItem value="supabase">Supabase</SelectItem>
+                  <SelectItem value="redis">Redis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="contextFormat">Context Format</Label>
+              <Select 
+                value={nodeData.contextFormat || 'prepend'} 
+                onValueChange={(value) => handleInputChange('contextFormat', value)}
+              >
+                <SelectTrigger id="contextFormat">
+                  <SelectValue placeholder="Select format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prepend">Prepend to Prompt</SelectItem>
+                  <SelectItem value="messages">Message Array</SelectItem>
+                  <SelectItem value="summary">Summary Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="mt-4">
+              <Button 
+                onClick={handleViewContext}
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+              >
+                View Context
+              </Button>
+            </div>
+          </>
+        );
+
+      case 'feedback':
+        return (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="feedbackType">Feedback Type</Label>
+              <Select 
+                value={nodeData.feedbackType || 'thumbsUpDown'} 
+                onValueChange={(value) => handleInputChange('feedbackType', value)}
+              >
+                <SelectTrigger id="feedbackType">
+                  <SelectValue placeholder="Select feedback type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="thumbsUpDown">Thumbs Up/Down</SelectItem>
+                  <SelectItem value="starRating">1-5 Stars</SelectItem>
+                  <SelectItem value="textComment">Text Comment</SelectItem>
+                  <SelectItem value="combined">Combined (Stars + Comment)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="storeFeedback">Store Feedback in Supabase</Label>
+                <input
+                  type="checkbox"
+                  id="storeFeedback"
+                  checked={nodeData.storeFeedback ?? true}
+                  onChange={(e) => handleInputChange('storeFeedback', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                Feedback will be stored with Task ID, Query, Response, and Score
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="feedbackPrompt">Feedback Prompt (optional)</Label>
+              <Input 
+                id="feedbackPrompt"
+                placeholder="E.g., 'Was this response helpful?'"
+                value={nodeData.feedbackPrompt ?? ''}
+                onChange={(e) => handleInputChange('feedbackPrompt', e.target.value)}
+              />
             </div>
           </>
         );
@@ -425,36 +722,186 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
               Performance Metrics
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-2 pb-4 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tasks-processed">Tasks Processed</Label>
-                <Input
-                  id="tasks-processed"
-                  type="number"
-                  value={nodeData.metrics?.tasksProcessed || 0}
-                  onChange={(e) => handleMetricsChange('tasksProcessed', parseInt(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="error-rate">Error Rate (%)</Label>
-                <Input
-                  id="error-rate"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={nodeData.metrics?.errorRate ? (nodeData.metrics.errorRate * 100).toFixed(1) : "0.0"}
-                  onChange={(e) => handleMetricsChange('errorRate', parseFloat(e.target.value) / 100 || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="latency">Latency (ms)</Label>
-                <Input
-                  id="latency"
-                  type="number"
-                  value={nodeData.metrics?.latency || 0}
-                  onChange={(e) => handleMetricsChange('latency', parseInt(e.target.value) || 0)}
-                />
-              </div>
+              {nodeData.type === 'retriever' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="recall-rate">Recall Rate (%)</Label>
+                    <Input
+                      id="recall-rate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={nodeData.metrics?.recallRate ? (nodeData.metrics.recallRate * 100).toFixed(1) : "0.0"}
+                      onChange={(e) => handleMetricsChange('recallRate', parseFloat(e.target.value) / 100 || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="precision">Precision (%)</Label>
+                    <Input
+                      id="precision"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={nodeData.metrics?.precision ? (nodeData.metrics.precision * 100).toFixed(1) : "0.0"}
+                      onChange={(e) => handleMetricsChange('precision', parseFloat(e.target.value) / 100 || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="retrieval-latency">Retrieval Latency (ms)</Label>
+                    <Input
+                      id="retrieval-latency"
+                      type="number"
+                      value={nodeData.metrics?.retrievalLatency || 0}
+                      onChange={(e) => handleMetricsChange('retrievalLatency', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {nodeData.type === 'aiResponse' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="response-relevance">Response Relevance (%)</Label>
+                    <Input
+                      id="response-relevance"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={nodeData.metrics?.responseRelevance ? (nodeData.metrics.responseRelevance * 100).toFixed(1) : "0.0"}
+                      onChange={(e) => handleMetricsChange('responseRelevance', parseFloat(e.target.value) / 100 || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="response-length">Response Length (chars)</Label>
+                    <Input
+                      id="response-length"
+                      type="number"
+                      value={nodeData.metrics?.responseLength || 0}
+                      onChange={(e) => handleMetricsChange('responseLength', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="generation-latency">Generation Latency (ms)</Label>
+                    <Input
+                      id="generation-latency"
+                      type="number"
+                      value={nodeData.metrics?.generationLatency || 0}
+                      onChange={(e) => handleMetricsChange('generationLatency', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {nodeData.type === 'feedback' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="feedback-count">Feedback Count</Label>
+                    <Input
+                      id="feedback-count"
+                      type="number"
+                      value={nodeData.metrics?.feedbackCount || 0}
+                      onChange={(e) => handleMetricsChange('feedbackCount', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="average-rating">Average Rating (out of 5)</Label>
+                    <Input
+                      id="average-rating"
+                      type="number"
+                      min="0"
+                      max="5"
+                      step="0.1"
+                      value={nodeData.metrics?.averageRating || 0}
+                      onChange={(e) => handleMetricsChange('averageRating', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="positive-percentage">Positive Feedback (%)</Label>
+                    <Input
+                      id="positive-percentage"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={nodeData.metrics?.positivePercentage ? (nodeData.metrics.positivePercentage * 100).toFixed(1) : "0.0"}
+                      onChange={(e) => handleMetricsChange('positivePercentage', parseFloat(e.target.value) / 100 || 0)}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {nodeData.type === 'contextManager' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="context-size">Context Size (chars)</Label>
+                    <Input
+                      id="context-size"
+                      type="number"
+                      value={nodeData.metrics?.contextSize || 0}
+                      onChange={(e) => handleMetricsChange('contextSize', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="message-count">Message Count</Label>
+                    <Input
+                      id="message-count"
+                      type="number"
+                      value={nodeData.metrics?.messageCount || 0}
+                      onChange={(e) => handleMetricsChange('messageCount', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="processing-time">Processing Time (ms)</Label>
+                    <Input
+                      id="processing-time"
+                      type="number"
+                      value={nodeData.metrics?.processingTime || 0}
+                      onChange={(e) => handleMetricsChange('processingTime', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {(nodeData.type !== 'retriever' && 
+                nodeData.type !== 'aiResponse' && 
+                nodeData.type !== 'feedback' && 
+                nodeData.type !== 'contextManager') && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="tasks-processed">Tasks Processed</Label>
+                    <Input
+                      id="tasks-processed"
+                      type="number"
+                      value={nodeData.metrics?.tasksProcessed || 0}
+                      onChange={(e) => handleMetricsChange('tasksProcessed', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="error-rate">Error Rate (%)</Label>
+                    <Input
+                      id="error-rate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={nodeData.metrics?.errorRate ? (nodeData.metrics.errorRate * 100).toFixed(1) : "0.0"}
+                      onChange={(e) => handleMetricsChange('errorRate', parseFloat(e.target.value) / 100 || 0)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="latency">Latency (ms)</Label>
+                    <Input
+                      id="latency"
+                      type="number"
+                      value={nodeData.metrics?.latency || 0}
+                      onChange={(e) => handleMetricsChange('latency', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </>
+              )}
             </CollapsibleContent>
           </Collapsible>
           
@@ -468,6 +915,76 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
           </div>
         </div>
       )}
+
+      {/* Test Query Results Dialog */}
+      <Dialog open={showTestQuery} onOpenChange={setShowTestQuery}>
+        <DialogContent className="sm:max-w-[700px] bg-gray-900 border-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Test Query Results</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="p-3 bg-gray-800 rounded-md">
+              <p className="font-semibold text-sm">Query</p>
+              <p className="text-gray-300">{queryInput}</p>
+            </div>
+            
+            <Table>
+              <TableCaption>Top {testResults.length} documents retrieved</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Document</TableHead>
+                  <TableHead>Relevance</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {testResults.map((result, index) => (
+                  <TableRow key={index} className={result.score < 0.75 ? "text-gray-500" : ""}>
+                    <TableCell>
+                      <p className="font-medium">{result.title}</p>
+                      <p className="text-sm text-gray-400 mt-1">{result.snippet}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={result.score >= 0.8 ? "bg-green-700" : result.score >= 0.6 ? "bg-yellow-700" : "bg-red-700"}>
+                        {(result.score * 100).toFixed(1)}%
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowTestQuery(false)} className="bg-indigo-600 hover:bg-indigo-700">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Context View Dialog */}
+      <Dialog open={showContextView} onOpenChange={setShowContextView}>
+        <DialogContent className="sm:max-w-[600px] bg-gray-900 border-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Conversation Context</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            {contextMessages.map((message, index) => (
+              <div 
+                key={index} 
+                className={`p-3 rounded-md ${message.role === 'user' ? 'bg-blue-900' : 'bg-gray-800'}`}
+              >
+                <p className="font-semibold text-xs text-gray-400 uppercase mb-1">{message.role}</p>
+                <p className="text-gray-300">{message.content}</p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowContextView(false)} className="bg-indigo-600 hover:bg-indigo-700">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
