@@ -16,22 +16,33 @@ const Index = () => {
           <h1 className="text-xl font-bold">FlowVerse Monitor</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white border-blue-500"
+          >
             <Save className="h-4 w-4" />
             Save
           </Button>
-          <Button variant="outline" size="sm" className="flex items-center gap-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white border-green-500"
+          >
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Button size="sm" className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700">
+          <Button 
+            size="sm" 
+            className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700"
+          >
             <Play className="h-4 w-4" />
             Run Flow
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
-            className="flex items-center gap-1 text-gray-400 hover:text-white"
+            className="flex items-center gap-1 text-red-400 hover:text-white hover:bg-red-700"
             onClick={() => signOut()}
           >
             <LogOut className="h-4 w-4" />
