@@ -153,7 +153,7 @@ const DocumentList = ({
       setProcessingId(doc.id);
       
       const { data, error } = await supabase.functions.invoke('process-document', {
-        body: { documentId: doc.id, knowledgeBaseId }
+        body: { documentId: doc.id }
       });
       
       if (error) throw error;
@@ -169,6 +169,12 @@ const DocumentList = ({
         .eq('id', doc.id);
         
       if (updateError) throw updateError;
+      
+      setTimeout(() => {
+        if (onDocumentDeleted) {
+          onDocumentDeleted();
+        }
+      }, 3000);
       
     } catch (error) {
       console.error('Error reprocessing document:', error);

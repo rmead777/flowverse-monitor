@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
 // Define the function handler
@@ -168,23 +167,47 @@ async function searchSupabase(
     });
   }
 
-  // Query the document_chunks table using vector similarity search
-  const { data: chunks, error: searchError } = await supabase.rpc(
-    'match_document_chunks',
-    {
-      query_embedding: embedding,
-      match_threshold: similarityThreshold,
-      match_count: limit,
-      match_condition: matchCondition
+  try {
+    // First check if the match_document_chunks function exists
+    const { data: funcExists, error: funcCheckError } = await supabase.rpc(
+      'match_document_chunks',
+      {
+        query_embedding: embedding,
+        match_threshold: similarityThreshold,
+        match_count: limit,
+        match_condition: matchCondition
+      }
+    );
+
+    if (funcCheckError && funcCheckError.message.includes('does not exist')) {
+      // If the function doesn't exist, fallback to direct query
+      console.log('match_document_chunks function does not exist, using direct query instead');
+
+      const { data: chunks, error: directQueryError } = await supabase
+        .from('document_chunks')
+        .select('id, content, document_id, knowledge_base_id, metadata')
+        .eq('knowledge_base_id', knowledgeBaseId)
+        .limit(limit);
+
+      if (directQueryError) {
+        console.error("Error in direct document_chunks query:", directQueryError);
+        throw directQueryError;
+      }
+
+      // Since we can't do similarity search without the function, just return all chunks
+      return chunks || [];
+    } else if (funcCheckError) {
+      console.error("Error checking match_document_chunks function:", funcCheckError);
+      throw funcCheckError;
     }
-  );
 
-  if (searchError) {
-    console.error("Error in Supabase vector search:", searchError);
-    throw searchError;
+    // If we got here, the function exists and we got results
+    return funcExists || [];
+  } catch (error) {
+    console.error("Error in Supabase vector search:", error);
+    // Return empty results rather than failing completely
+    return [];
   }
-
-  return chunks || [];
 }
 
 // Function to search using Pinecone

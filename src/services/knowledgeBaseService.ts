@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { KnowledgeBase, KnowledgeBaseType, DocumentFile, PineconeIndex, PineconeStat } from "@/types/knowledgeBase";
 import { v4 as uuidv4 } from "uuid";
@@ -145,7 +146,7 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
     // Call the process-document function
     const { data: processData, error: processError } = await supabase.functions
       .invoke('process-document', {
-        body: { document_id: documentData[0].id }
+        body: { documentId: documentData[0].id }
       });
       
     if (processError) {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { KnowledgeBase, DocumentFile, KnowledgeBaseType, PineconeIndex } from '@/types/knowledgeBase';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +20,7 @@ import {
   transferToPinecone
 } from '@/services/knowledgeBaseService';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ensureStorageIsSetup, reprocessPendingDocuments } from '@/utils/setupStorage';
 
 export function useKnowledgeBase() {
   const { toast } = useToast();
@@ -121,8 +121,10 @@ export function useKnowledgeBase() {
   
   // Upload a document
   const uploadDocumentMutation = useMutation({
-    mutationFn: ({ knowledgeBaseId, file }: { knowledgeBaseId: string; file: File }) => 
-      uploadDocument(knowledgeBaseId, file),
+    mutationFn: async ({ knowledgeBaseId, file }: { knowledgeBaseId: string; file: File }) => {
+      await ensureStorageIsSetup();
+      return uploadDocument(knowledgeBaseId, file);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['documents', data.knowledge_base_id] });
       queryClient.invalidateQueries({ queryKey: ['knowledgeBase', data.knowledge_base_id] });
@@ -305,6 +307,18 @@ export function useKnowledgeBase() {
     }
   });
   
+  // Reprocess documents
+  const reprocessDocumentsMutation = useMutation({
+    mutationFn: (knowledgeBaseId?: string) => reprocessPendingDocuments(knowledgeBaseId),
+    onSuccess: (data) => {
+      if (data?.processed > 0) {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['documents'] });
+        }, 3000);
+      }
+    }
+  });
+  
   return {
     // Knowledge base operations
     knowledgeBases,
@@ -347,6 +361,10 @@ export function useKnowledgeBase() {
     getPineconeStats: getPineconeStatsMutation.mutate,
     isGettingPineconeStats: getPineconeStatsMutation.isPending,
     transferToPinecone: transferToPineconeMutation.mutate,
-    isTransferringToPinecone: transferToPineconeMutation.isPending
+    isTransferringToPinecone: transferToPineconeMutation.isPending,
+    
+    // Reprocess documents
+    reprocessDocuments: reprocessDocumentsMutation.mutate,
+    isReprocessingDocuments: reprocessDocumentsMutation.isPending
   };
 }
