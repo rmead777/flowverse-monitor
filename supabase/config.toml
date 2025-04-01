@@ -58,4 +58,5 @@ enable_confirmations = false
 sender_name = "Supabase"
 
 [functions]
+# This properly configures the functions section with correct syntax
 serve_local = true
