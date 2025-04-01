@@ -46,6 +46,8 @@ const knowledgeBases = [
 
 const embeddingModels = [
   { id: 'text-embedding-ada-002', name: 'text-embedding-ada-002' },
+  { id: 'voyage-finance-2', name: 'Voyage Finance 2' },
+  { id: 'voyage-3-large', name: 'Voyage 3 Large' },
   { id: 'sentence-transformers', name: 'Sentence Transformers' },
 ];
 
