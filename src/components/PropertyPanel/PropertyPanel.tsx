@@ -76,6 +76,7 @@ const PropertyPanel = ({ selectedNode, onUpdateNode, onClose }: PropertyPanelPro
           />
         );
       case 'feedback':
+      case 'feedbackCollector':
         return (
           <FeedbackCollectorNodeProperties
             nodeData={selectedNode.data}

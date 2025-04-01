@@ -17,7 +17,20 @@ import 'reactflow/dist/style.css';
 import { Button } from './ui/button';
 import CustomNode from './CustomNode';
 import NodeDetails from './NodeDetails';
-import { Save, Download, Upload, RotateCcw, Undo, Redo, Plus, Minus, Maximize, Loader, Trash2 } from 'lucide-react';
+import { 
+  Save, 
+  Download, 
+  Upload, 
+  RotateCcw, 
+  Undo, 
+  Redo, 
+  Plus, 
+  Minus, 
+  Maximize, 
+  Loader, 
+  Trash2,
+  LayoutGrid
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +38,7 @@ import SaveFlowDialog from './SaveFlowDialog';
 import { v4 as uuidv4 } from 'uuid';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import NodeTypeDialog, { NodeType } from './NodeTypeDialog';
+import { AutoLayoutService } from './AutoLayoutService';
 
 const initialNodes = [
   {
@@ -199,6 +213,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [isNodeTypeDialogOpen, setIsNodeTypeDialogOpen] = useState(false);
+  const [layoutDirection, setLayoutDirection] = useState<'horizontal' | 'vertical'>('horizontal');
   const { toast } = useToast();
   const { user } = useAuth();
   const reactFlowInstance = useReactFlow();
@@ -798,6 +813,31 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     [reactFlowInstance, setNodes, saveToUndoHistory]
   );
 
+  const autoLayout = useCallback(() => {
+    saveToUndoHistory();
+    
+    const newNodes = AutoLayoutService.autoLayout(nodes, edges, layoutDirection);
+    setNodes(newNodes);
+    
+    setTimeout(() => {
+      reactFlowInstance.fitView({ padding: 0.2 });
+    }, 50);
+    
+    toast({
+      title: "Flow auto-arranged",
+      description: `Nodes have been arranged in a ${layoutDirection} layout pattern.`,
+    });
+  }, [nodes, edges, layoutDirection, reactFlowInstance, setNodes, toast, saveToUndoHistory]);
+
+  const toggleLayoutDirection = useCallback(() => {
+    setLayoutDirection(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
+    
+    toast({
+      title: "Layout direction changed",
+      description: `Layout will now be ${layoutDirection === 'horizontal' ? 'vertical' : 'horizontal'} when auto-arranged.`,
+    });
+  }, [layoutDirection, toast]);
+
   return (
     <div 
       className="w-full h-full relative" 
@@ -923,6 +963,16 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
                   <Trash2 className="h-4 w-4" />
                   Delete
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={autoLayout}
+                  aria-label="Auto Layout"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Auto Layout
+                </Button>
               </Panel>
               
               <Panel position="bottom-left" className="bg-gray-800 p-2 rounded-md shadow-md flex gap-2">
@@ -948,6 +998,15 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
                   <Redo className="h-4 w-4" />
                   Redo
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 bg-white hover:bg-gray-100 text-black border-gray-300"
+                  onClick={toggleLayoutDirection}
+                  aria-label="Toggle Layout Direction"
+                >
+                  {layoutDirection === 'horizontal' ? 'Horizontal' : 'Vertical'} Layout
+                </Button>
               </Panel>
             </ReactFlow>
           </ContextMenuTrigger>
@@ -963,6 +1022,13 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
             >
               <Trash2 className="h-4 w-4" />
               Delete Node
+            </ContextMenuItem>
+            <ContextMenuItem
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={autoLayout}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Auto Layout
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
