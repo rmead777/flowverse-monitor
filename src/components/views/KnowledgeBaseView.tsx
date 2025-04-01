@@ -12,6 +12,7 @@ import DocumentList from '@/components/DocumentList';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/context/AuthContext';
 import { KnowledgeBase, KnowledgeBaseType, DocumentFile } from '@/types/knowledgeBase';
+import PineconeConfig from '@/components/PineconeConfig';
 
 const KnowledgeBaseView = () => {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ const KnowledgeBaseView = () => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('general');
   
   const [newKbData, setNewKbData] = useState({
     name: '',
@@ -30,7 +32,8 @@ const KnowledgeBaseView = () => {
     description: '',
     apiKey: '',
     environment: '',
-    namespace: ''
+    namespace: '',
+    embeddingModel: 'text-embedding-ada-002'
   });
   
   const [apiKeyData, setApiKeyData] = useState({
@@ -63,6 +66,12 @@ const KnowledgeBaseView = () => {
     
     if (newKbData.apiKey) {
       config.apiKey = newKbData.apiKey;
+    }
+    
+    if (newKbData.embeddingModel) {
+      config.embedding_model = newKbData.embeddingModel;
+    } else {
+      config.embedding_model = 'text-embedding-ada-002';
     }
     
     switch (newKbData.type) {
@@ -100,7 +109,8 @@ const KnowledgeBaseView = () => {
       description: '',
       apiKey: '',
       environment: '',
-      namespace: ''
+      namespace: '',
+      embeddingModel: 'text-embedding-ada-002'
     });
     
     setShowAddKbDialog(false);
@@ -197,12 +207,13 @@ const KnowledgeBaseView = () => {
         return (
           <>
             <div className="space-y-2">
-              <Label htmlFor="environment">Environment</Label>
+              <Label htmlFor="environment">Pinecone Environment</Label>
               <Input 
                 id="environment" 
                 value={newKbData.environment}
                 onChange={(e) => setNewKbData({...newKbData, environment: e.target.value})}
                 className="bg-gray-800 border-gray-700 text-white"
+                placeholder="us-west1-gcp"
               />
             </div>
             <div className="space-y-2">
@@ -212,7 +223,24 @@ const KnowledgeBaseView = () => {
                 value={newKbData.namespace}
                 onChange={(e) => setNewKbData({...newKbData, namespace: e.target.value})}
                 className="bg-gray-800 border-gray-700 text-white"
+                placeholder="my-namespace"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="embeddingModel">Embedding Model</Label>
+              <Select 
+                value={newKbData.embeddingModel || 'text-embedding-ada-002'} 
+                onValueChange={(value) => setNewKbData({...newKbData, embeddingModel: value})}
+              >
+                <SelectTrigger id="embeddingModel" className="bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="Select embedding model" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                  <SelectItem value="text-embedding-ada-002">OpenAI (text-embedding-ada-002)</SelectItem>
+                  <SelectItem value="voyage-finance-2">Voyage Finance 2</SelectItem>
+                  <SelectItem value="voyage-3-large">Voyage 3 Large</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </>
         );
@@ -407,7 +435,7 @@ const KnowledgeBaseView = () => {
 
       {selectedKnowledgeBase && (
         <Dialog open={showKbDetailsDialog} onOpenChange={setShowKbDetailsDialog}>
-          <DialogContent className="sm:max-w-[650px] bg-gray-900 border-gray-800 text-white">
+          <DialogContent className="sm:max-w-[750px] bg-gray-900 border-gray-800 text-white">
             <DialogHeader>
               <div className="flex justify-between items-center">
                 <DialogTitle className="flex items-center gap-2">
@@ -425,44 +453,151 @@ const KnowledgeBaseView = () => {
                 </Button>
               </div>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Type</span>
-                  <p className="text-white capitalize">{selectedKnowledgeBase.type}</p>
-                </div>
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Status</span>
-                  <div className="flex items-center">
-                    <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor(selectedKnowledgeBase.status)} mr-2`}></span>
-                    <p className="text-white capitalize">{selectedKnowledgeBase.status}</p>
+            
+            <div className="border-b border-gray-800 mt-2 mb-4">
+              <div className="flex space-x-4">
+                <button
+                  className={`pb-2 pt-1 px-1 border-b-2 ${
+                    activeTab === 'general' 
+                      ? 'border-indigo-500 text-indigo-400 font-medium' 
+                      : 'border-transparent text-gray-400 hover:text-gray-300'
+                  }`}
+                  onClick={() => setActiveTab('general')}
+                >
+                  General
+                </button>
+                {selectedKnowledgeBase.type === 'pinecone' && (
+                  <button
+                    className={`pb-2 pt-1 px-1 border-b-2 ${
+                      activeTab === 'pinecone' 
+                        ? 'border-indigo-500 text-indigo-400 font-medium' 
+                        : 'border-transparent text-gray-400 hover:text-gray-300'
+                    }`}
+                    onClick={() => setActiveTab('pinecone')}
+                  >
+                    Pinecone Config
+                  </button>
+                )}
+                <button
+                  className={`pb-2 pt-1 px-1 border-b-2 ${
+                    activeTab === 'documents' 
+                      ? 'border-indigo-500 text-indigo-400 font-medium' 
+                      : 'border-transparent text-gray-400 hover:text-gray-300'
+                  }`}
+                  onClick={() => setActiveTab('documents')}
+                >
+                  Documents
+                </button>
+              </div>
+            </div>
+            
+            {activeTab === 'general' && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-gray-800 p-3 rounded-md">
+                    <span className="text-gray-400 text-xs">Type</span>
+                    <p className="text-white capitalize">{selectedKnowledgeBase.type}</p>
+                  </div>
+                  <div className="bg-gray-800 p-3 rounded-md">
+                    <span className="text-gray-400 text-xs">Status</span>
+                    <div className="flex items-center">
+                      <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor(selectedKnowledgeBase.status)} mr-2`}></span>
+                      <p className="text-white capitalize">{selectedKnowledgeBase.status}</p>
+                    </div>
+                  </div>
+                  <div className="bg-gray-800 p-3 rounded-md">
+                    <span className="text-gray-400 text-xs">Documents</span>
+                    <p className="text-white">{selectedKnowledgeBase.documentCount || 0}</p>
+                  </div>
+                  <div className="bg-gray-800 p-3 rounded-md">
+                    <span className="text-gray-400 text-xs">Last Updated</span>
+                    <p className="text-white">{new Date(selectedKnowledgeBase.lastUpdated).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Documents</span>
-                  <p className="text-white">{selectedKnowledgeBase.documentCount || 0}</p>
-                </div>
-                <div className="bg-gray-800 p-3 rounded-md">
-                  <span className="text-gray-400 text-xs">Last Updated</span>
-                  <p className="text-white">{new Date(selectedKnowledgeBase.lastUpdated).toLocaleDateString()}</p>
+                
+                {selectedKnowledgeBase.description && (
+                  <div className="bg-gray-800 p-3 rounded-md mb-4">
+                    <span className="text-gray-400 text-xs">Description</span>
+                    <p className="text-white">{selectedKnowledgeBase.description}</p>
+                  </div>
+                )}
+                
+                <div className="bg-gray-800 p-3 rounded-md mb-4">
+                  <span className="text-gray-400 text-xs">Configuration</span>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Embedding Model</span>
+                      <span className="text-white">
+                        {selectedKnowledgeBase.config.embedding_model || 'text-embedding-ada-002'}
+                      </span>
+                    </div>
+                    
+                    {selectedKnowledgeBase.type === 'pinecone' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Pinecone Index</span>
+                          <span className="text-white">
+                            {selectedKnowledgeBase.config.pineconeIndex || 'Not configured'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Namespace</span>
+                          <span className="text-white">
+                            {selectedKnowledgeBase.config.pineconeNamespace || 'default'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {selectedKnowledgeBase.type === 'weaviate' && selectedKnowledgeBase.config.url && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">URL</span>
+                        <span className="text-white">{selectedKnowledgeBase.config.url}</span>
+                      </div>
+                    )}
+                    
+                    {selectedKnowledgeBase.type === 'supabase' && selectedKnowledgeBase.config.url && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">URL</span>
+                        <span className="text-white">{selectedKnowledgeBase.config.url}</span>
+                      </div>
+                    )}
+                    
+                    {selectedKnowledgeBase.type === 'google' && selectedKnowledgeBase.config.searchEngineId && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Search Engine ID</span>
+                        <span className="text-white">{selectedKnowledgeBase.config.searchEngineId}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              
-              {selectedKnowledgeBase.description && (
-                <div className="bg-gray-800 p-3 rounded-md mb-4">
-                  <span className="text-gray-400 text-xs">Description</span>
-                  <p className="text-white">{selectedKnowledgeBase.description}</p>
-                </div>
-              )}
-              
-              <div className="border-t border-gray-800 pt-4">
+            )}
+            
+            {activeTab === 'pinecone' && selectedKnowledgeBase.type === 'pinecone' && (
+              <div className="py-4">
+                <PineconeConfig 
+                  knowledgeBase={selectedKnowledgeBase}
+                  onUpdateConfig={(config) => {
+                    updateKnowledgeBase({
+                      id: selectedKnowledgeBase.id,
+                      updates: { config }
+                    });
+                  }}
+                />
+              </div>
+            )}
+            
+            {activeTab === 'documents' && (
+              <div className="py-4">
                 <DocumentList 
                   documents={selectedKbDocuments || []}
                   isLoading={isLoadingDocuments}
                   onUploadClick={() => setUploadDialogOpen(true)}
                 />
               </div>
-            </div>
+            )}
+            
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowKbDetailsDialog(false)} className="border-gray-700 text-gray-300">
                 Close

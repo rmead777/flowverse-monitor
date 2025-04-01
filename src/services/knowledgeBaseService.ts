@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { KnowledgeBase, KnowledgeBaseType, DocumentFile } from "@/types/knowledgeBase";
+import { KnowledgeBase, KnowledgeBaseType, DocumentFile, PineconeIndex, PineconeStat } from "@/types/knowledgeBase";
 import { v4 as uuidv4 } from "uuid";
 
 // Type guard for knowledge base objects
@@ -143,6 +143,17 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
       
     if (documentError) throw documentError;
     
+    // Call the process-document function
+    const { data: processData, error: processError } = await supabase.functions
+      .invoke('process-document', {
+        body: { document_id: documentData[0].id }
+      });
+      
+    if (processError) {
+      console.error('Error processing document:', processError);
+      // Don't throw here, as the document was uploaded successfully
+    }
+    
     return documentData[0] as DocumentFile;
   } catch (error) {
     console.error('Error uploading document:', error);
@@ -216,6 +227,158 @@ export async function getApiKeysByService(service: string) {
     return data;
   } catch (error) {
     console.error('Error fetching API keys:', error);
+    throw error;
+  }
+}
+
+export async function vectorSearch(knowledgeBaseId: string, query: string, limit: number = 10, similarityThreshold: number = 0.8, filters: Record<string, any> = {}) {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('vector-search', {
+        body: { 
+          knowledge_base_id: knowledgeBaseId,
+          query,
+          limit,
+          similarity_threshold: similarityThreshold,
+          filters
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error performing vector search:', error);
+    throw error;
+  }
+}
+
+// New Pinecone-specific functions
+
+export async function listPineconeIndexes(): Promise<PineconeIndex[]> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { operation: 'list-indexes' }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error listing Pinecone indexes:', error);
+    throw error;
+  }
+}
+
+export async function createPineconeIndex(name: string, dimension: number = 1536, serverless: boolean = true, options: any = {}): Promise<PineconeIndex> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { 
+          operation: 'create-index',
+          name,
+          dimension,
+          serverless,
+          ...options
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating Pinecone index:', error);
+    throw error;
+  }
+}
+
+export async function describePineconeIndex(indexName: string): Promise<PineconeIndex> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { 
+          operation: 'describe-index',
+          indexName
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error describing Pinecone index:', error);
+    throw error;
+  }
+}
+
+export async function deletePineconeIndex(indexName: string): Promise<{ success: boolean }> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { 
+          operation: 'delete-index',
+          indexName
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error deleting Pinecone index:', error);
+    throw error;
+  }
+}
+
+export async function listPineconeNamespaces(indexName: string): Promise<{ namespaces: string[], stats: any }> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { 
+          operation: 'list-namespaces',
+          indexName
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error listing Pinecone namespaces:', error);
+    throw error;
+  }
+}
+
+export async function getPineconeStats(indexName: string, namespace?: string): Promise<PineconeStat> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { 
+          operation: 'get-stats',
+          indexName,
+          namespace
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error getting Pinecone stats:', error);
+    throw error;
+  }
+}
+
+export async function transferToPinecone(knowledgeBaseId: string, indexName: string, namespace: string): Promise<{ success: boolean }> {
+  try {
+    const { data, error } = await supabase.functions
+      .invoke('pinecone-operations', {
+        body: { 
+          operation: 'transfer-to-pinecone',
+          knowledge_base_id: knowledgeBaseId,
+          indexName,
+          namespace
+        }
+      });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error transferring to Pinecone:', error);
     throw error;
   }
 }

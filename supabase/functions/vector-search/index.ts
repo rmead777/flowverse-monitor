@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get knowledge base details to determine embedding model
+    // Get knowledge base details to determine search method and embedding model
     const { data: knowledgeBase, error: kbError } = await supabase
       .from("knowledge_bases")
       .select("*")
@@ -67,68 +67,56 @@ Deno.serve(async (req: Request) => {
     // Generate embedding for the query
     const embedding = await generateEmbedding(query, embeddingModel);
 
-    // Build the filters for the query
-    let matchCondition = `knowledge_base_id = '${knowledge_base_id}'`;
+    // Perform search based on knowledge base type
+    let results = [];
     
-    // Apply additional filters if provided
-    if (filters && typeof filters === 'object') {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (key && value !== undefined && value !== null) {
-          // Handle metadata filters specially
-          if (key.startsWith('metadata.')) {
-            const metadataKey = key.replace('metadata.', '');
-            matchCondition += ` AND metadata->>'${metadataKey}' = '${value}'`;
-          }
-        }
-      });
-    }
-
-    // Query the document_chunks table using vector similarity search
-    const { data: chunks, error: searchError } = await supabase.rpc(
-      'match_document_chunks',
-      {
-        query_embedding: embedding,
-        match_threshold: similarity_threshold,
-        match_count: limit,
-        match_condition: matchCondition
-      }
-    );
-
-    if (searchError) {
-      console.error("Error in vector search:", searchError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Error performing vector search", 
-          details: searchError 
-        }),
-        { headers: corsHeaders, status: 500 }
+    if (knowledgeBase.type === 'pinecone') {
+      // Search using Pinecone
+      results = await searchPinecone(
+        knowledgeBase,
+        embedding,
+        limit,
+        similarity_threshold,
+        filters
+      );
+    } else {
+      // Search using Supabase pgvector
+      results = await searchSupabase(
+        supabase,
+        knowledge_base_id,
+        embedding,
+        limit,
+        similarity_threshold,
+        filters
       );
     }
 
-    // Get document details for the chunks
-    const documentIds = [...new Set(chunks.map(chunk => chunk.document_id))];
-    const { data: documents, error: docsError } = await supabase
-      .from("documents")
-      .select("id, filename, file_type, metadata")
-      .in("id", documentIds);
-      
-    if (docsError) {
-      console.error("Error fetching document details:", docsError);
+    // Get document details for the chunks if needed
+    if (results.length > 0 && !results[0].document) {
+      const documentIds = [...new Set(results.map(chunk => chunk.document_id))];
+      const { data: documents, error: docsError } = await supabase
+        .from("documents")
+        .select("id, filename, file_type, metadata")
+        .in("id", documentIds);
+        
+      if (docsError) {
+        console.error("Error fetching document details:", docsError);
+      } else if (documents) {
+        // Combine chunk results with document details
+        results = results.map(chunk => {
+          const document = documents.find(doc => doc.id === chunk.document_id) || null;
+          return {
+            ...chunk,
+            document: document ? {
+              id: document.id,
+              filename: document.filename,
+              file_type: document.file_type,
+              metadata: document.metadata
+            } : null
+          };
+        });
+      }
     }
-    
-    // Combine chunk results with document details
-    const results = chunks.map(chunk => {
-      const document = documents?.find(doc => doc.id === chunk.document_id) || null;
-      return {
-        ...chunk,
-        document: document ? {
-          id: document.id,
-          filename: document.filename,
-          file_type: document.file_type,
-          metadata: document.metadata
-        } : null
-      };
-    });
 
     // Return the results
     return new Response(
@@ -154,6 +142,149 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+// Function to search using Supabase pgvector
+async function searchSupabase(
+  supabase: any,
+  knowledgeBaseId: string,
+  embedding: number[],
+  limit: number,
+  similarityThreshold: number,
+  filters: Record<string, any>
+) {
+  // Build the filters for the query
+  let matchCondition = `knowledge_base_id = '${knowledgeBaseId}'`;
+  
+  // Apply additional filters if provided
+  if (filters && typeof filters === 'object') {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (key && value !== undefined && value !== null) {
+        // Handle metadata filters specially
+        if (key.startsWith('metadata.')) {
+          const metadataKey = key.replace('metadata.', '');
+          matchCondition += ` AND metadata->>'${metadataKey}' = '${value}'`;
+        }
+      }
+    });
+  }
+
+  // Query the document_chunks table using vector similarity search
+  const { data: chunks, error: searchError } = await supabase.rpc(
+    'match_document_chunks',
+    {
+      query_embedding: embedding,
+      match_threshold: similarityThreshold,
+      match_count: limit,
+      match_condition: matchCondition
+    }
+  );
+
+  if (searchError) {
+    console.error("Error in Supabase vector search:", searchError);
+    throw searchError;
+  }
+
+  return chunks || [];
+}
+
+// Function to search using Pinecone
+async function searchPinecone(
+  knowledgeBase: any,
+  embedding: number[],
+  limit: number,
+  similarityThreshold: number,
+  filters: Record<string, any>
+) {
+  try {
+    const pineconeApiKey = Deno.env.get("PINECONE_API_KEY") as string;
+    if (!pineconeApiKey) {
+      throw new Error("PINECONE_API_KEY not set in environment");
+    }
+
+    const indexName = knowledgeBase.config?.pineconeIndex;
+    const namespace = knowledgeBase.config?.pineconeNamespace || "";
+    
+    if (!indexName) {
+      throw new Error("Pinecone index name not found in knowledge base config");
+    }
+
+    // Get index description to get the host
+    const describeResponse = await fetch(`https://api.pinecone.io/indexes/${indexName}`, {
+      method: "GET",
+      headers: {
+        "Api-Key": pineconeApiKey,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!describeResponse.ok) {
+      const errorText = await describeResponse.text();
+      throw new Error(`API request failed with status ${describeResponse.status}: ${errorText}`);
+    }
+
+    const indexData = await describeResponse.json();
+    const host = indexData.host;
+    
+    if (!host) {
+      throw new Error(`No host found for index ${indexName}`);
+    }
+
+    // Build filter if any
+    const metadataFilter: Record<string, any> = {};
+    if (filters && typeof filters === 'object') {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (key && value !== undefined && value !== null && key.startsWith('metadata.')) {
+          const metadataKey = key.replace('metadata.', '');
+          metadataFilter[metadataKey] = value;
+        }
+      });
+    }
+
+    // Query the Pinecone index
+    const requestBody: any = {
+      vector: embedding,
+      topK: limit,
+      includeMetadata: true,
+      namespace
+    };
+
+    if (Object.keys(metadataFilter).length > 0) {
+      requestBody.filter = metadataFilter;
+    }
+
+    const searchResponse = await fetch(`https://${host}/query`, {
+      method: "POST",
+      headers: {
+        "Api-Key": pineconeApiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!searchResponse.ok) {
+      const errorText = await searchResponse.text();
+      throw new Error(`Search request failed with status ${searchResponse.status}: ${errorText}`);
+    }
+
+    const searchData = await searchResponse.json();
+    
+    // Convert Pinecone results to our standard format
+    return (searchData.matches || [])
+      .filter((match: any) => match.score >= similarityThreshold)
+      .map((match: any) => ({
+        id: match.id,
+        content: match.metadata.content,
+        document_id: match.metadata.document_id,
+        knowledge_base_id: knowledgeBase.id,
+        metadata: match.metadata,
+        similarity: match.score,
+        document: null  // Will be populated later
+      }));
+  } catch (error) {
+    console.error("Error in Pinecone search:", error);
+    throw error;
+  }
+}
 
 // Function to generate embeddings using the appropriate API
 async function generateEmbedding(text: string, model: string): Promise<number[]> {

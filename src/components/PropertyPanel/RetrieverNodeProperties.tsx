@@ -1,5 +1,5 @@
 
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { 
   FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage 
 } from '@/components/ui/form';
@@ -31,18 +31,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { getKnowledgeBases, vectorSearch } from '@/services/knowledgeBaseService';
+import { Loader2 } from 'lucide-react';
 
 interface RetrieverNodePropertiesProps {
   nodeData: any;
   onUpdateNode: (updatedData: any) => void;
 }
-
-const knowledgeBases = [
-  { id: 'financial_reports', name: 'Financial Reports' },
-  { id: 'operational_procedures', name: 'Operational Procedures' },
-  { id: 'market_analysis', name: 'Market Analysis' },
-  { id: 'regulatory_compliance', name: 'Regulatory Compliance' },
-];
 
 const embeddingModels = [
   { id: 'text-embedding-ada-002', name: 'text-embedding-ada-002' },
@@ -52,14 +49,17 @@ const embeddingModels = [
 ];
 
 const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodePropertiesProps) => {
+  const { toast } = useToast();
   const [isTestQueryModalOpen, setIsTestQueryModalOpen] = useState(false);
+  const [testQuery, setTestQuery] = useState('How can we optimize operational expenses?');
+  const [retrievedDocs, setRetrievedDocs] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   
-  // Mock retrieved documents for the test query dialog
-  const retrievedDocs = [
-    { title: 'Q4 Financial Report 2023', snippet: 'Operating expenses decreased by 12% compared to Q3, primarily due to the implementation of...', relevanceScore: 0.92 },
-    { title: 'Operational Efficiency Analysis', snippet: 'The new automated workflow resulted in a 15% increase in productivity across departments...', relevanceScore: 0.87 },
-    { title: 'Annual Budget Projection 2024', snippet: 'Based on current trends, we project a 7% increase in revenue and a 3% decrease in costs...', relevanceScore: 0.81 },
-  ];
+  // Fetch knowledge bases
+  const { data: knowledgeBases, isLoading: isLoadingKnowledgeBases } = useQuery({
+    queryKey: ['knowledgeBases'],
+    queryFn: getKnowledgeBases
+  });
 
   // Define form schema
   const formSchema = z.object({
@@ -74,7 +74,7 @@ const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodeProper
   // Default values
   const defaultValues = {
     label: nodeData.label || 'Retriever',
-    knowledgeBase: nodeData.knowledgeBase || 'financial_reports',
+    knowledgeBase: nodeData.knowledgeBase || '',
     numResults: nodeData.numResults || 10,
     similarityThreshold: nodeData.similarityThreshold || 0.8,
     filters: nodeData.filters || 'metadata.year >= 2023',
@@ -98,6 +98,60 @@ const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodeProper
       embeddingModel: values.embeddingModel,
     };
     onUpdateNode(updatedData);
+  };
+
+  const handleTestQuery = async () => {
+    if (!testQuery.trim() || !form.getValues().knowledgeBase) {
+      toast({
+        title: 'Missing information',
+        description: 'Please enter a query and select a knowledge base',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const knowledgeBaseId = form.getValues().knowledgeBase;
+      const limit = form.getValues().numResults;
+      const similarityThreshold = form.getValues().similarityThreshold;
+      
+      // Parse filters if any
+      let filters = {};
+      const filtersText = form.getValues().filters;
+      if (filtersText && filtersText.trim() !== '') {
+        try {
+          // Simple parsing for format like "metadata.year >= 2023"
+          const parts = filtersText.split(/\s*(>=|<=|==|=|>|<)\s*/);
+          if (parts.length >= 3) {
+            const key = parts[0].trim();
+            const value = isNaN(Number(parts[2])) ? parts[2].trim() : Number(parts[2]);
+            filters = { [key]: value };
+          }
+        } catch (error) {
+          console.error('Error parsing filters:', error);
+        }
+      }
+
+      const result = await vectorSearch(
+        knowledgeBaseId,
+        testQuery,
+        limit,
+        similarityThreshold,
+        filters
+      );
+
+      setRetrievedDocs(result.results || []);
+      setIsTestQueryModalOpen(true);
+    } catch (error) {
+      toast({
+        title: 'Error performing search',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -136,7 +190,7 @@ const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodeProper
                 <FormLabel>Knowledge Base</FormLabel>
                 <Select 
                   onValueChange={field.onChange} 
-                  defaultValue={field.value}
+                  value={field.value}
                 >
                   <FormControl>
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -144,13 +198,21 @@ const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodeProper
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                    {knowledgeBases.map(kb => (
-                      <SelectItem key={kb.id} value={kb.id}>{kb.name}</SelectItem>
-                    ))}
+                    {isLoadingKnowledgeBases ? (
+                      <SelectItem value="loading" disabled>Loading knowledge bases...</SelectItem>
+                    ) : knowledgeBases && knowledgeBases.length > 0 ? (
+                      knowledgeBases.map(kb => (
+                        <SelectItem key={kb.id} value={kb.id}>
+                          {kb.name} ({kb.type})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>No knowledge bases found</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <FormDescription className="text-gray-400">
-                  Vector database to retrieve documents from
+                  Select a knowledge base for document retrieval
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -234,7 +296,7 @@ const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodeProper
                 <FormLabel>Embedding Model</FormLabel>
                 <Select 
                   onValueChange={field.onChange} 
-                  defaultValue={field.value}
+                  value={field.value}
                 >
                   <FormControl>
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -255,46 +317,72 @@ const RetrieverNodeProperties = ({ nodeData, onUpdateNode }: RetrieverNodeProper
             )}
           />
           
-          <div className="pt-3">
-            <Dialog open={isTestQueryModalOpen} onOpenChange={setIsTestQueryModalOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  type="button" 
-                  variant="secondary"
-                  className="w-full"
-                >
-                  Test Query
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-gray-900 text-white border-gray-700 max-w-4xl max-h-[80vh] overflow-auto">
-                <DialogHeader>
-                  <DialogTitle>Test Query Results</DialogTitle>
-                  <DialogDescription className="text-gray-400">
-                    Documents retrieved for query: "How can we optimize operational expenses?"
-                  </DialogDescription>
-                </DialogHeader>
-                
+          <div className="space-y-2 pt-3">
+            <Label>Test Query</Label>
+            <div className="flex gap-2">
+              <Input 
+                className="flex-1 bg-gray-800 border-gray-700 text-white"
+                placeholder="Enter a test query..."
+                value={testQuery}
+                onChange={(e) => setTestQuery(e.target.value)}
+              />
+              <Button 
+                type="button" 
+                variant="secondary"
+                onClick={handleTestQuery}
+                disabled={isSearching}
+              >
+                {isSearching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Search
+              </Button>
+            </div>
+          </div>
+          
+          <Dialog open={isTestQueryModalOpen} onOpenChange={setIsTestQueryModalOpen}>
+            <DialogContent className="bg-gray-900 text-white border-gray-700 max-w-4xl max-h-[80vh] overflow-auto">
+              <DialogHeader>
+                <DialogTitle>Test Query Results</DialogTitle>
+                <DialogDescription className="text-gray-400">
+                  Documents retrieved for query: "{testQuery}"
+                </DialogDescription>
+              </DialogHeader>
+              
+              {retrievedDocs.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-white">Document Title</TableHead>
-                      <TableHead className="text-white">Snippet</TableHead>
-                      <TableHead className="text-white text-right">Relevance Score</TableHead>
+                      <TableHead className="text-white">Document</TableHead>
+                      <TableHead className="text-white">Content</TableHead>
+                      <TableHead className="text-white text-right">Relevance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {retrievedDocs.map((doc, index) => (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">{doc.title}</TableCell>
-                        <TableCell className="max-w-lg">{doc.snippet}</TableCell>
-                        <TableCell className="text-right">{doc.relevanceScore.toFixed(2)}</TableCell>
+                        <TableCell className="font-medium">
+                          {doc.document?.filename || 'Unknown document'}
+                        </TableCell>
+                        <TableCell className="max-w-lg">
+                          {doc.content.length > 200 
+                            ? `${doc.content.substring(0, 200)}...` 
+                            : doc.content}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {typeof doc.similarity === 'number' 
+                            ? doc.similarity.toFixed(2) 
+                            : '—'}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </DialogContent>
-            </Dialog>
-          </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  No results found for your query.
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </form>
       </Form>
     </div>

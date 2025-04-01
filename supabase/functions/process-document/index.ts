@@ -135,6 +135,7 @@ Deno.serve(async (req: Request) => {
     // Process and store chunks in batches to avoid timeout
     const batchSize = 5;
     let processedChunks = 0;
+    let storedChunks = [];
     
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batchChunks = chunks.slice(i, i + batchSize);
@@ -158,28 +159,50 @@ Deno.serve(async (req: Request) => {
       
       // Insert chunks with embeddings
       for (const { embedding, content, chunkIndex } of validEmbeddings) {
-        const { error: chunkError } = await supabase
+        const metadata = { 
+          source: document.filename,
+          chunk_index: chunkIndex,
+          page: Math.floor(chunkIndex / 2) + 1 // Approximate page number
+        };
+
+        const { data: chunkData, error: chunkError } = await supabase
           .from("document_chunks")
           .insert({
             document_id: document_id,
             knowledge_base_id: document.knowledge_base_id,
             content: content,
             embedding: embedding,
-            metadata: { 
-              source: document.filename,
-              chunk_index: chunkIndex,
-              page: Math.floor(chunkIndex / 2) + 1 // Approximate page number
-            }
-          });
+            metadata: metadata
+          })
+          .select();
           
         if (chunkError) {
           console.error(`Error inserting chunk ${chunkIndex}:`, chunkError);
         } else {
           processedChunks++;
+          if (chunkData && chunkData.length > 0) {
+            storedChunks.push(chunkData[0]);
+          }
         }
       }
       
       console.log(`Processed ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks`);
+    }
+
+    // If this is a Pinecone knowledge base, also send the chunks to Pinecone
+    if (document.knowledge_bases?.type === "pinecone" && 
+        document.knowledge_bases?.config?.pineconeIndex &&
+        storedChunks.length > 0) {
+      
+      const pineconeApiKey = Deno.env.get("PINECONE_API_KEY");
+      if (pineconeApiKey) {
+        await sendChunksToPinecone(
+          pineconeApiKey,
+          document.knowledge_bases.config.pineconeIndex,
+          document.knowledge_bases.config.pineconeNamespace || "",
+          storedChunks
+        );
+      }
     }
 
     // Update document status based on processing results
@@ -311,6 +334,93 @@ async function generateEmbedding(text: string, apiKey: string, model: string): P
     }
   } catch (error) {
     console.error(`Error generating embedding with model ${model}:`, error);
+    throw error;
+  }
+}
+
+// Function to send chunks to Pinecone
+async function sendChunksToPinecone(
+  apiKey: string,
+  indexName: string,
+  namespace: string,
+  chunks: any[]
+) {
+  try {
+    // Get index description to get the host
+    const describeResponse = await fetch(`https://api.pinecone.io/indexes/${indexName}`, {
+      method: "GET",
+      headers: {
+        "Api-Key": apiKey,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!describeResponse.ok) {
+      const errorText = await describeResponse.text();
+      throw new Error(`API request failed with status ${describeResponse.status}: ${errorText}`);
+    }
+
+    const indexData = await describeResponse.json();
+    const host = indexData.host;
+    
+    if (!host) {
+      throw new Error(`No host found for index ${indexName}`);
+    }
+
+    // Batch size for upserts (Pinecone has limits)
+    const batchSize = 100;
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Format vectors for Pinecone
+    const vectors = chunks.map(chunk => ({
+      id: chunk.id,
+      values: chunk.embedding,
+      metadata: {
+        ...chunk.metadata,
+        content: chunk.content,
+        document_id: chunk.document_id,
+        knowledge_base_id: chunk.knowledge_base_id
+      }
+    }));
+
+    // Process in batches
+    for (let i = 0; i < vectors.length; i += batchSize) {
+      const batch = vectors.slice(i, i + batchSize);
+      
+      const upsertBody = {
+        vectors: batch,
+        namespace
+      };
+
+      try {
+        const response = await fetch(`https://${host}/vectors/upsert`, {
+          method: "POST",
+          headers: {
+            "Api-Key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(upsertBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Batch ${i / batchSize} failed: ${errorText}`);
+          errorCount += batch.length;
+        } else {
+          successCount += batch.length;
+          console.log(`Batch ${i / batchSize} success: ${batch.length} vectors`);
+        }
+      } catch (batchError) {
+        console.error(`Error in batch ${i / batchSize}:`, batchError);
+        errorCount += batch.length;
+      }
+    }
+
+    console.log(`Pinecone upload summary: ${successCount} successful, ${errorCount} failed`);
+    return { success: true, successCount, errorCount };
+  } catch (error) {
+    console.error("Error sending chunks to Pinecone:", error);
     throw error;
   }
 }
