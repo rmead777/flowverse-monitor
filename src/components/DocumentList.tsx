@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { DocumentFile } from '@/types/knowledgeBase';
@@ -72,10 +71,8 @@ const DocumentList = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Apply filtering and sorting whenever documents, search query, status filter, or sort option changes
     let filtered = [...documents];
     
-    // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(doc => 
@@ -84,12 +81,10 @@ const DocumentList = ({
       );
     }
     
-    // Apply status filter
     if (selectedStatus) {
       filtered = filtered.filter(doc => doc.status === selectedStatus);
     }
     
-    // Apply sorting
     switch(sortOption) {
       case 'newest':
         filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -126,7 +121,6 @@ const DocumentList = ({
         
       if (error) throw error;
       
-      // Create a download link and trigger the download
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
@@ -158,7 +152,6 @@ const DocumentList = ({
     try {
       setProcessingId(doc.id);
       
-      // Call the process-document edge function to reprocess the document
       const { data, error } = await supabase.functions.invoke('process-document', {
         body: { documentId: doc.id, knowledgeBaseId }
       });
@@ -170,7 +163,6 @@ const DocumentList = ({
         description: `${doc.filename} is being processed`,
       });
       
-      // Update document status in the UI
       const { error: updateError } = await supabase
         .from('documents')
         .update({ status: 'pending' })
@@ -194,14 +186,12 @@ const DocumentList = ({
     try {
       setDeletingId(doc.id);
       
-      // Delete document from storage
       const { error: storageError } = await supabase.storage
         .from('documents')
         .remove([doc.file_path]);
         
       if (storageError) throw storageError;
       
-      // Delete document chunks from database
       const { error: chunksError } = await supabase
         .from('document_chunks')
         .delete()
@@ -209,7 +199,6 @@ const DocumentList = ({
         
       if (chunksError) throw chunksError;
       
-      // Delete document from database
       const { error: docError } = await supabase
         .from('documents')
         .delete()
@@ -222,7 +211,6 @@ const DocumentList = ({
         description: `${doc.filename} has been deleted`
       });
       
-      // Call the callback to refresh the document list
       if (onDocumentDeleted) {
         onDocumentDeleted();
       }
@@ -297,7 +285,6 @@ const DocumentList = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Search and filter controls */}
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -309,12 +296,12 @@ const DocumentList = ({
               />
             </div>
             <div className="flex gap-2">
-              <Select value={selectedStatus || ''} onValueChange={(value) => setSelectedStatus(value || null)}>
+              <Select value={selectedStatus || 'all'} onValueChange={(value) => setSelectedStatus(value === 'all' ? null : value)}>
                 <SelectTrigger className="bg-gray-800 border-gray-700 w-[130px]">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="processed">Processed</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
@@ -369,7 +356,6 @@ const DocumentList = ({
             </div>
           </div>
 
-          {/* Document table */}
           <div className="overflow-auto rounded-lg border border-gray-800">
             <Table>
               <TableHeader className="bg-gray-900">
@@ -458,7 +444,6 @@ const DocumentList = ({
         </div>
       )}
 
-      {/* Document metadata dialog */}
       <Dialog open={showMetadataDialog} onOpenChange={setShowMetadataDialog}>
         <DialogContent className="sm:max-w-[600px] bg-gray-900 border-gray-800 text-white">
           <DialogHeader>

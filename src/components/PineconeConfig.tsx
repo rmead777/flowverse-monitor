@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import {
@@ -48,12 +47,10 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
     region: 'us-west-2'
   });
 
-  // Load indexes on component mount
   useEffect(() => {
     loadIndexes();
   }, []);
 
-  // Set selected index and namespace from knowledge base config
   useEffect(() => {
     if (knowledgeBase && knowledgeBase.config) {
       if (knowledgeBase.config.pineconeIndex) {
@@ -71,7 +68,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
       setLoading(true);
       const data = await listPineconeIndexes();
       
-      // Make sure the data is an array before setting it
       if (Array.isArray(data)) {
         setIndexes(data);
       } else {
@@ -103,7 +99,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
       setIndexLoading(true);
       const response = await listPineconeNamespaces(indexName);
       
-      // Check if response and namespaces exist and are in expected format
       if (response && Array.isArray(response.namespaces)) {
         setNamespaces(response.namespaces);
       } else {
@@ -132,7 +127,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
     try {
       setLoading(true);
       
-      // Validate index name
       if (!newIndexData.name || newIndexData.name.trim() === '') {
         toast({
           title: 'Invalid index name',
@@ -142,7 +136,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
         return;
       }
       
-      // Create the index
       await createPineconeIndex(
         newIndexData.name, 
         newIndexData.dimension, 
@@ -155,21 +148,17 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
         description: `Index "${newIndexData.name}" has been created successfully`,
       });
       
-      // Reload indexes
       await loadIndexes();
       
-      // Select the new index
       setSelectedIndex(newIndexData.name);
       loadNamespaces(newIndexData.name);
       
-      // Update knowledge base config
       onUpdateConfig({
         ...knowledgeBase?.config,
         pineconeIndex: newIndexData.name,
         pineconeNamespace: selectedNamespace || ''
       });
       
-      // Reset form and close dialog
       setNewIndexData({
         name: '',
         dimension: 1536,
@@ -203,10 +192,8 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
         description: `Index "${indexName}" has been deleted successfully`,
       });
       
-      // Reload indexes
       await loadIndexes();
       
-      // Clear selection if this was the selected index
       if (selectedIndex === indexName) {
         setSelectedIndex('');
         setSelectedNamespace('');
@@ -232,7 +219,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
     setSelectedIndex(indexName);
     loadNamespaces(indexName);
     
-    // Update knowledge base config
     onUpdateConfig({
       ...knowledgeBase?.config,
       pineconeIndex: indexName,
@@ -243,7 +229,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
   const handleNamespaceSelect = (namespace: string) => {
     setSelectedNamespace(namespace);
     
-    // Update knowledge base config
     onUpdateConfig({
       ...knowledgeBase?.config,
       pineconeIndex: selectedIndex,
@@ -254,22 +239,18 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
   const handleAddNamespace = () => {
     if (!namespaceInput.trim()) return;
     
-    // Add namespace to list
     if (!namespaces.includes(namespaceInput)) {
       setNamespaces([...namespaces, namespaceInput]);
     }
     
-    // Select the new namespace
     setSelectedNamespace(namespaceInput);
     
-    // Update knowledge base config
     onUpdateConfig({
       ...knowledgeBase?.config,
       pineconeIndex: selectedIndex,
       pineconeNamespace: namespaceInput
     });
     
-    // Reset input
     setNamespaceInput('');
   };
 
@@ -279,10 +260,8 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
     try {
       setTransferLoading(true);
       
-      // Use namespace or default
       const namespace = selectedNamespace || 'default';
       
-      // Start transfer process
       const result = await transferToPinecone(
         knowledgeBase.id, 
         selectedIndex, 
@@ -295,7 +274,6 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
           description: 'Your documents are being transferred to Pinecone. This may take a few minutes.',
         });
         
-        // Close dialog
         setShowTransferDialog(false);
       } else {
         throw new Error('Transfer failed');
@@ -378,7 +356,7 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
             <Label htmlFor="namespaceSelect">Namespace</Label>
             <div className="flex gap-2">
               <Select 
-                value={selectedNamespace} 
+                value={selectedNamespace || 'default-namespace'} 
                 onValueChange={handleNamespaceSelect}
                 disabled={indexLoading}
               >
@@ -388,7 +366,7 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
                 <SelectContent className="bg-gray-900 border-gray-700 text-white">
                   {Array.isArray(namespaces) && namespaces.length > 0 ? (
                     namespaces.map(ns => (
-                      <SelectItem key={ns} value={ns}>
+                      <SelectItem key={ns || 'default-namespace'} value={ns || 'default-namespace'}>
                         {ns || '(default namespace)'}
                       </SelectItem>
                     ))

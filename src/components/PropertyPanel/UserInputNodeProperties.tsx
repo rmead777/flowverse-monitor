@@ -1,4 +1,3 @@
-
 import { memo, useState } from 'react';
 import { 
   FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage 
@@ -30,7 +29,6 @@ const preprocessingOptions = [
 const UserInputNodeProperties = ({ nodeData, onUpdateNode }: UserInputNodePropertiesProps) => {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
 
-  // Define form schema
   const formSchema = z.object({
     label: z.string().min(1, 'Label is required'),
     inputType: z.string(),
@@ -39,7 +37,6 @@ const UserInputNodeProperties = ({ nodeData, onUpdateNode }: UserInputNodeProper
     errorHandling: z.boolean(),
   });
 
-  // Default values
   const defaultValues = {
     label: nodeData.label || 'User Input',
     inputType: nodeData.inputType || 'text',
@@ -52,7 +49,6 @@ const UserInputNodeProperties = ({ nodeData, onUpdateNode }: UserInputNodeProper
     errorHandling: nodeData.errorHandling !== undefined ? nodeData.errorHandling : true,
   };
 
-  // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues,

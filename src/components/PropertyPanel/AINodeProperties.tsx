@@ -1,4 +1,3 @@
-
 import { memo, useState } from 'react';
 import { 
   FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage 
@@ -42,7 +41,6 @@ const responseFormats = [
 const AINodeProperties = ({ nodeData, onUpdateNode }: AINodePropertiesProps) => {
   const [isTestGenerationModalOpen, setIsTestGenerationModalOpen] = useState(false);
   
-  // Mock generated response for the test dialog
   const generatedResponse = {
     text: `Based on the financial documents provided, here are the key recommendations for optimizing your operational expenses:
 
@@ -70,7 +68,6 @@ These recommendations are based on your Q3 2023 financial reports and the operat
     ]
   };
 
-  // Define form schema
   const formSchema = z.object({
     label: z.string().min(1, 'Label is required'),
     model: z.string(),
@@ -79,7 +76,6 @@ These recommendations are based on your Q3 2023 financial reports and the operat
     responseFormat: z.string(),
   });
 
-  // Default values
   const defaultValues = {
     label: nodeData.label || 'AI Response',
     model: nodeData.model || 'gpt-4o',
@@ -88,7 +84,6 @@ These recommendations are based on your Q3 2023 financial reports and the operat
     responseFormat: nodeData.responseFormat || 'plain',
   };
 
-  // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues,

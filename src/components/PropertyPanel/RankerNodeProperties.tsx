@@ -1,4 +1,3 @@
-
 import { memo, useState } from 'react';
 import { 
   FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage 
@@ -45,7 +44,6 @@ const rankingModels = [
 const RankerNodeProperties = ({ nodeData, onUpdateNode }: RankerNodePropertiesProps) => {
   const [isTestRankingModalOpen, setIsTestRankingModalOpen] = useState(false);
   
-  // Mock ranked documents for the test ranking dialog
   const rankedDocs = [
     { 
       title: 'Operational Efficiency Analysis', 
@@ -67,7 +65,6 @@ const RankerNodeProperties = ({ nodeData, onUpdateNode }: RankerNodePropertiesPr
     },
   ];
 
-  // Define form schema
   const formSchema = z.object({
     label: z.string().min(1, 'Label is required'),
     rankingModel: z.string(),
@@ -75,7 +72,6 @@ const RankerNodeProperties = ({ nodeData, onUpdateNode }: RankerNodePropertiesPr
     rerankingLatencyThreshold: z.number().min(50).max(500),
   });
 
-  // Default values
   const defaultValues = {
     label: nodeData.label || 'Ranker',
     rankingModel: nodeData.rankingModel || 'cross-encoder/ms-marco-MiniLM-L-6-v2',
@@ -83,7 +79,6 @@ const RankerNodeProperties = ({ nodeData, onUpdateNode }: RankerNodePropertiesPr
     rerankingLatencyThreshold: nodeData.rerankingLatencyThreshold || 200,
   };
 
-  // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues,
