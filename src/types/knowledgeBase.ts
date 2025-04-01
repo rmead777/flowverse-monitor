@@ -29,3 +29,24 @@ export interface DocumentFile {
   created_at: string;
   updated_at: string;
 }
+
+export interface ChunkingConfig {
+  chunkSize: number;
+  chunkOverlap: number;
+  chunkMethod: 'fixed' | 'paragraph' | 'sentence';
+}
+
+export interface EmbeddingConfig {
+  model: string;
+  dimensions: number;
+}
+
+export interface KnowledgeBaseStats {
+  totalDocuments: number;
+  processedDocuments: number;
+  pendingDocuments: number;
+  failedDocuments: number;
+  totalChunks: number;
+  avgChunksPerDocument: number;
+  lastUpdated: string;
+}
