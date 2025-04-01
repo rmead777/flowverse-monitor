@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { KnowledgeBase, KnowledgeBaseType, DocumentFile, PineconeIndex, PineconeStat } from "@/types/knowledgeBase";
 import { v4 as uuidv4 } from "uuid";
@@ -252,8 +251,7 @@ export async function vectorSearch(knowledgeBaseId: string, query: string, limit
   }
 }
 
-// New Pinecone-specific functions
-
+// Pinecone-specific functions
 export async function listPineconeIndexes(): Promise<PineconeIndex[]> {
   try {
     const { data, error } = await supabase.functions
@@ -262,10 +260,18 @@ export async function listPineconeIndexes(): Promise<PineconeIndex[]> {
       });
       
     if (error) throw error;
+    
+    // Ensure we return an array even if the API returns unexpected data
+    if (!data || !Array.isArray(data)) {
+      console.error("Unexpected response format from pinecone-operations:", data);
+      return [];
+    }
+    
     return data;
   } catch (error) {
     console.error('Error listing Pinecone indexes:', error);
-    throw error;
+    // Return empty array on error to prevent UI crashes
+    return [];
   }
 }
 
@@ -337,10 +343,18 @@ export async function listPineconeNamespaces(indexName: string): Promise<{ names
       });
       
     if (error) throw error;
+    
+    // Make sure we have a properly formatted response
+    if (!data || !Array.isArray(data.namespaces)) {
+      console.error("Unexpected namespace response format:", data);
+      return { namespaces: [], stats: {} };
+    }
+    
     return data;
   } catch (error) {
     console.error('Error listing Pinecone namespaces:', error);
-    throw error;
+    // Return safe defaults on error
+    return { namespaces: [], stats: {} };
   }
 }
 

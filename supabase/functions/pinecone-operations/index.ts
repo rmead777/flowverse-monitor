@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
 // Define the function handler
@@ -125,7 +124,16 @@ async function listPineconeIndexes(apiKey: string) {
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    
+    // Make sure we return an array of indexes
+    if (data && Array.isArray(data)) {
+      return data;
+    } else {
+      console.error("Unexpected response format from Pinecone API:", data);
+      // Return an empty array rather than failing completely
+      return [];
+    }
   } catch (error) {
     console.error("Error listing Pinecone indexes:", error);
     throw error;
@@ -260,13 +268,15 @@ async function listNamespaces(apiKey: string, indexName: string) {
 
     const data = await response.json();
     
+    // Ensure we return a properly formatted object
     return {
       namespaces: Object.keys(data.namespaces || {}),
       stats: data
     };
   } catch (error) {
     console.error(`Error listing namespaces for index ${indexName}:`, error);
-    throw error;
+    // Return a safe default
+    return { namespaces: [], stats: {} };
   }
 }
 

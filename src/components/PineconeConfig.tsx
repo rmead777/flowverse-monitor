@@ -70,8 +70,22 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
     try {
       setLoading(true);
       const data = await listPineconeIndexes();
-      setIndexes(data);
+      
+      // Make sure the data is an array before setting it
+      if (Array.isArray(data)) {
+        setIndexes(data);
+      } else {
+        console.error("Received non-array data from listPineconeIndexes:", data);
+        setIndexes([]);
+        toast({
+          title: 'Error loading Pinecone indexes',
+          description: 'Received invalid data format from Pinecone API',
+          variant: 'destructive'
+        });
+      }
     } catch (error) {
+      console.error("Error in loadIndexes:", error);
+      setIndexes([]);
       toast({
         title: 'Error loading Pinecone indexes',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -87,9 +101,23 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
     
     try {
       setIndexLoading(true);
-      const { namespaces } = await listPineconeNamespaces(indexName);
-      setNamespaces(namespaces);
+      const response = await listPineconeNamespaces(indexName);
+      
+      // Check if response and namespaces exist and are in expected format
+      if (response && Array.isArray(response.namespaces)) {
+        setNamespaces(response.namespaces);
+      } else {
+        console.error("Invalid namespace response:", response);
+        setNamespaces([]);
+        toast({
+          title: 'Error loading namespaces',
+          description: 'Received invalid data format',
+          variant: 'destructive'
+        });
+      }
     } catch (error) {
+      console.error("Error in loadNamespaces:", error);
+      setNamespaces([]);
       toast({
         title: 'Error loading namespaces',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -320,11 +348,15 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
                 <SelectValue placeholder="Select an index" />
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-700 text-white">
-                {indexes.map(index => (
-                  <SelectItem key={index.name} value={index.name}>
-                    {index.name} ({index.dimension}d)
-                  </SelectItem>
-                ))}
+                {Array.isArray(indexes) && indexes.length > 0 ? (
+                  indexes.map(index => (
+                    <SelectItem key={index.name} value={index.name}>
+                      {index.name} ({index.dimension}d)
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-indexes" disabled>No indexes available</SelectItem>
+                )}
               </SelectContent>
             </Select>
             {selectedIndex && (
@@ -354,11 +386,15 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
                   <SelectValue placeholder="Select a namespace" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-900 border-gray-700 text-white">
-                  {namespaces.map(ns => (
-                    <SelectItem key={ns} value={ns}>
-                      {ns || '(default namespace)'}
-                    </SelectItem>
-                  ))}
+                  {Array.isArray(namespaces) && namespaces.length > 0 ? (
+                    namespaces.map(ns => (
+                      <SelectItem key={ns} value={ns}>
+                        {ns || '(default namespace)'}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-namespaces" disabled>No namespaces available</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
