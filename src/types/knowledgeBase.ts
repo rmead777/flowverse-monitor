@@ -16,7 +16,7 @@ export interface KnowledgeBase {
   updated_at: string;
 }
 
-export interface Document {
+export interface DocumentFile {
   id: string;
   knowledge_base_id: string;
   filename: string;

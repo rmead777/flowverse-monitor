@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -12,7 +11,7 @@ import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import DocumentList from '@/components/DocumentList';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/context/AuthContext';
-import { KnowledgeBase, KnowledgeBaseType } from '@/types/knowledgeBase';
+import { KnowledgeBase, KnowledgeBaseType, DocumentFile } from '@/types/knowledgeBase';
 
 const KnowledgeBaseView = () => {
   const { user } = useAuth();
@@ -62,12 +61,10 @@ const KnowledgeBaseView = () => {
   const handleAddKnowledgeBase = () => {
     const config: Record<string, any> = {};
     
-    // Add the API key to the config
     if (newKbData.apiKey) {
       config.apiKey = newKbData.apiKey;
     }
     
-    // Add type-specific config
     switch (newKbData.type) {
       case 'pinecone':
         config.environment = newKbData.environment;
@@ -89,7 +86,6 @@ const KnowledgeBaseView = () => {
       config
     });
     
-    // If API key was provided, also save it separately
     if (newKbData.apiKey) {
       saveApiKey({
         service: newKbData.type,
@@ -144,7 +140,6 @@ const KnowledgeBaseView = () => {
     
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      // Check if the file is a PDF or text file
       if (file.type === 'application/pdf' || file.type.startsWith('text/')) {
         uploadDocument({
           knowledgeBaseId: selectedKnowledgeBase.id,
@@ -338,7 +333,6 @@ const KnowledgeBaseView = () => {
         </div>
       )}
 
-      {/* Add Knowledge Base Dialog */}
       <Dialog open={showAddKbDialog} onOpenChange={setShowAddKbDialog}>
         <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-800 text-white">
           <DialogHeader>
@@ -411,7 +405,6 @@ const KnowledgeBaseView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Knowledge Base Details Dialog */}
       {selectedKnowledgeBase && (
         <Dialog open={showKbDetailsDialog} onOpenChange={setShowKbDetailsDialog}>
           <DialogContent className="sm:max-w-[650px] bg-gray-900 border-gray-800 text-white">
@@ -477,7 +470,6 @@ const KnowledgeBaseView = () => {
               <Button 
                 className="bg-indigo-600 hover:bg-indigo-700"
                 onClick={() => {
-                  // Toggle the knowledge base status
                   const newStatus = selectedKnowledgeBase.status === 'active' ? 'inactive' : 'active';
                   updateKnowledgeBase({
                     id: selectedKnowledgeBase.id,
@@ -492,7 +484,6 @@ const KnowledgeBaseView = () => {
         </Dialog>
       )}
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="bg-gray-900 border-gray-800 text-white">
           <AlertDialogHeader>
@@ -520,7 +511,6 @@ const KnowledgeBaseView = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* API Key Dialog */}
       <Dialog open={apiKeyDialog} onOpenChange={setApiKeyDialog}>
         <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-800 text-white">
           <DialogHeader>
@@ -583,7 +573,6 @@ const KnowledgeBaseView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Document Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent className="sm:max-w-[500px] bg-gray-900 border-gray-800 text-white">
           <DialogHeader>

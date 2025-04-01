@@ -1,13 +1,13 @@
 
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { Document } from '@/types/knowledgeBase';
+import { DocumentFile } from '@/types/knowledgeBase';
 import { FileText, DownloadCloud, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface DocumentListProps {
-  documents: Document[];
+  documents: DocumentFile[];
   isLoading: boolean;
   onUploadClick: () => void;
 }
@@ -16,7 +16,7 @@ const DocumentList = ({ documents, isLoading, onUploadClick }: DocumentListProps
   const { toast } = useToast();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const handleDownload = async (document: Document) => {
+  const handleDownload = async (document: DocumentFile) => {
     try {
       setDownloadingId(document.id);
       

@@ -1,8 +1,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { KnowledgeBase, KnowledgeBaseType } from "@/types/knowledgeBase";
-import { toast } from "@/hooks/use-toast";
+import { KnowledgeBase, KnowledgeBaseType, DocumentFile } from "@/types/knowledgeBase";
 import { v4 as uuidv4 } from "uuid";
+
+// Type guard for knowledge base objects
+const isKnowledgeBase = (obj: any): obj is KnowledgeBase => {
+  return obj && typeof obj.name === 'string' && typeof obj.type === 'string';
+};
 
 export async function getKnowledgeBases() {
   try {
@@ -18,7 +22,7 @@ export async function getKnowledgeBases() {
       ...kb,
       documentCount: kb.documents?.[0]?.count || 0,
       lastUpdated: kb.updated_at
-    }));
+    })) as KnowledgeBase[];
   } catch (error) {
     console.error('Error fetching knowledge bases:', error);
     throw error;
@@ -35,7 +39,7 @@ export async function createKnowledgeBase(name: string, type: KnowledgeBaseType,
       .select();
       
     if (error) throw error;
-    return data[0];
+    return data[0] as KnowledgeBase;
   } catch (error) {
     console.error('Error creating knowledge base:', error);
     throw error;
@@ -51,7 +55,7 @@ export async function updateKnowledgeBase(id: string, updates: Partial<Knowledge
       .select();
       
     if (error) throw error;
-    return data[0];
+    return data[0] as KnowledgeBase;
   } catch (error) {
     console.error('Error updating knowledge base:', error);
     throw error;
@@ -87,7 +91,7 @@ export async function getKnowledgeBaseById(id: string) {
       ...data,
       documentCount: data.documents?.[0]?.count || 0,
       lastUpdated: data.updated_at
-    };
+    } as KnowledgeBase;
   } catch (error) {
     console.error('Error fetching knowledge base:', error);
     throw error;
@@ -127,7 +131,7 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
       
     if (documentError) throw documentError;
     
-    return documentData[0];
+    return documentData[0] as DocumentFile;
   } catch (error) {
     console.error('Error uploading document:', error);
     throw error;
@@ -143,7 +147,7 @@ export async function getDocumentsByKnowledgeBaseId(knowledgeBaseId: string) {
       .order('created_at', { ascending: false });
       
     if (error) throw error;
-    return data;
+    return data as DocumentFile[];
   } catch (error) {
     console.error('Error fetching documents:', error);
     throw error;

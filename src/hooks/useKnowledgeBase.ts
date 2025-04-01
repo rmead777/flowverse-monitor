@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { KnowledgeBase, Document, KnowledgeBaseType } from '@/types/knowledgeBase';
+import { KnowledgeBase, DocumentFile, KnowledgeBaseType } from '@/types/knowledgeBase';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getKnowledgeBases, 
