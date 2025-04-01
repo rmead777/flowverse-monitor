@@ -34,13 +34,20 @@ export async function ensureStorageIsSetup() {
 
 export async function reprocessPendingDocuments(knowledgeBaseId?: string) {
   try {
+    console.log('Reprocessing pending documents for knowledge base:', knowledgeBaseId);
+    
     const { data, error } = await supabase.functions.invoke('reprocess-documents', {
       body: { knowledgeBaseId }
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error from reprocess-documents function:', error);
+      throw error;
+    }
     
-    if (data.processed > 0) {
+    console.log('Reprocess response:', data);
+    
+    if (data && data.processed > 0) {
       toast({
         title: 'Document Processing Started',
         description: `${data.processed} documents are being processed`

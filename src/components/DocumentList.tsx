@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { reprocessPendingDocuments } from '@/utils/setupStorage';
 
 interface DocumentListProps {
   documents: DocumentFile[];
@@ -69,6 +70,7 @@ const DocumentList = ({
   const [showMetadataDialog, setShowMetadataDialog] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isReprocessingAll, setIsReprocessingAll] = useState(false);
 
   useEffect(() => {
     let filtered = [...documents];
@@ -232,7 +234,45 @@ const DocumentList = ({
       setDeletingId(null);
     }
   };
-  
+
+  const handleReprocessAllDocuments = async () => {
+    if (!knowledgeBaseId) return;
+    
+    try {
+      setIsReprocessingAll(true);
+      
+      const result = await reprocessPendingDocuments(knowledgeBaseId);
+      
+      if (result && result.processed > 0) {
+        toast({
+          title: 'Documents Processing Started',
+          description: `${result.processed} documents are being reprocessed`,
+        });
+        
+        setTimeout(() => {
+          if (onDocumentDeleted) {
+            onDocumentDeleted();
+          }
+        }, 3000);
+      } else {
+        toast({
+          title: 'No Documents to Process',
+          description: 'There are no pending documents to reprocess',
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error reprocessing documents:', error);
+      toast({
+        title: 'Processing Error',
+        description: 'There was an error reprocessing the documents',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsReprocessingAll(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'processed':
@@ -265,16 +305,35 @@ const DocumentList = ({
     );
   }
 
+  const pendingCount = documents.filter(doc => doc.status === 'pending').length;
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Documents</h3>
-        <Button 
-          onClick={onUploadClick}
-          className="bg-indigo-600 hover:bg-indigo-700"
-        >
-          Upload Document
-        </Button>
+        <div className="flex gap-2">
+          {knowledgeBaseId && pendingCount > 0 && (
+            <Button 
+              onClick={handleReprocessAllDocuments}
+              variant="outline"
+              className="flex items-center gap-2 border-amber-700 text-amber-500 hover:bg-amber-900/20"
+              disabled={isReprocessingAll}
+            >
+              {isReprocessingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span>Reprocess {pendingCount} Document{pendingCount !== 1 ? 's' : ''}</span>
+            </Button>
+          )}
+          <Button 
+            onClick={onUploadClick}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            Upload Document
+          </Button>
+        </div>
       </div>
 
       {documents.length === 0 ? (
