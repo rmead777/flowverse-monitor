@@ -13,6 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import NodeDetailsInline from './NodeDetailsInline';
 import {
   Dialog,
