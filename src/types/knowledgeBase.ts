@@ -1,0 +1,31 @@
+
+export type KnowledgeBaseType = 'pinecone' | 'weaviate' | 'supabase' | 'google';
+export type KnowledgeBaseStatus = 'active' | 'inactive' | 'indexing' | 'error';
+
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  description: string | null;
+  type: KnowledgeBaseType;
+  status: KnowledgeBaseStatus;
+  config: Record<string, any>;
+  documentCount?: number;
+  lastUpdated: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Document {
+  id: string;
+  knowledge_base_id: string;
+  filename: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  status: 'pending' | 'processed' | 'failed';
+  metadata: Record<string, any>;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
