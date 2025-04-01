@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
 // Define the function handler
@@ -15,6 +16,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log("Vector search function invoked");
+    
     // Parse the request body
     const { query, knowledge_base_id, limit = 10, similarity_threshold = 0.8, filters = {} } = await req.json();
     
@@ -60,6 +63,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    console.log("Knowledge base config:", knowledgeBase.config);
+
     // Get the embedding model from knowledge base config or use default
     const embeddingModel = knowledgeBase.config?.embedding_model || 'text-embedding-ada-002';
     
@@ -70,6 +75,7 @@ Deno.serve(async (req: Request) => {
     let results = [];
     
     if (knowledgeBase.type === 'pinecone') {
+      console.log("Using Pinecone search");
       // Search using Pinecone
       results = await searchPinecone(
         knowledgeBase,
@@ -79,6 +85,7 @@ Deno.serve(async (req: Request) => {
         filters
       );
     } else {
+      console.log("Using Supabase pgvector search");
       // Search using Supabase pgvector
       results = await searchSupabase(
         supabase,
@@ -89,6 +96,8 @@ Deno.serve(async (req: Request) => {
         filters
       );
     }
+
+    console.log(`Search returned ${results.length} results`);
 
     // Get document details for the chunks if needed
     if (results.length > 0 && !results[0].document) {
@@ -311,6 +320,8 @@ async function searchPinecone(
 
 // Function to generate embeddings using the appropriate API
 async function generateEmbedding(text: string, model: string): Promise<number[]> {
+  console.log(`Generating embedding using model: ${model}`);
+  
   let endpoint = 'https://api.openai.com/v1/embeddings';
   let headers = {
     'Authorization': `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
@@ -343,6 +354,7 @@ async function generateEmbedding(text: string, model: string): Promise<number[]>
   }
 
   try {
+    console.log(`Making request to ${endpoint}`);
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: headers,
@@ -355,6 +367,7 @@ async function generateEmbedding(text: string, model: string): Promise<number[]>
     }
 
     const result = await response.json();
+    console.log("Embedding generated successfully");
     
     // Handle different API response formats
     if (model === 'voyage-finance-2' || model === 'voyage-3-large') {

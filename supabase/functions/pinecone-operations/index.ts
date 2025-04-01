@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
 // Define the function handler
@@ -126,11 +127,13 @@ async function listPineconeIndexes(apiKey: string) {
 
     const data = await response.json();
     
-    // Make sure we return an array of indexes
-    if (data && Array.isArray(data)) {
+    // Handle the nested indexes structure in the response
+    if (data && data.indexes && Array.isArray(data.indexes)) {
+      return data.indexes;
+    } else if (Array.isArray(data)) {
       return data;
     } else {
-      console.error("Unexpected response format from Pinecone API:", data);
+      console.log("Unexpected Pinecone API response format:", JSON.stringify(data));
       // Return an empty array rather than failing completely
       return [];
     }

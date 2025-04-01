@@ -1,101 +1,114 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
+// Add CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
+// Serve the HTTP request
+Deno.serve(async (req) => {
+  console.log("Reprocess-documents function invoked");
+  
+  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  
-  // Validate required environment variables
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('Missing required environment variables');
-    return new Response(
-      JSON.stringify({ error: 'Server configuration error - missing environment variables' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  
-  // Initialize Supabase client with service role for admin privileges
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  
+
   try {
-    // Get the request parameters
-    const { documentId, knowledgeBaseId } = await req.json();
+    // Get env variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    // Find pending documents to process
-    let pendingDocumentsQuery = supabase
+    // Validate env variables
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing environment variables');
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Parse request body
+    const { knowledgeBaseId } = await req.json();
+    console.log(`Looking for pending documents${knowledgeBaseId ? ` in knowledge base: ${knowledgeBaseId}` : ''}`);
+
+    // Find documents with 'pending' or 'failed' status
+    let query = supabase
       .from('documents')
-      .select('*')
-      .eq('status', 'pending');
+      .select('id, filename, status')
+      .in('status', ['pending', 'failed']);
     
-    // Add filters if provided
-    if (documentId) {
-      pendingDocumentsQuery = pendingDocumentsQuery.eq('id', documentId);
-    }
-    
+    // Filter by knowledge base ID if provided
     if (knowledgeBaseId) {
-      pendingDocumentsQuery = pendingDocumentsQuery.eq('knowledge_base_id', knowledgeBaseId);
+      query = query.eq('knowledge_base_id', knowledgeBaseId);
     }
-    
-    const { data: pendingDocuments, error: queryError } = await pendingDocumentsQuery;
-    
-    if (queryError) throw queryError;
-    
+
+    const { data: pendingDocuments, error: pendingError } = await query;
+
+    if (pendingError) {
+      console.error('Error finding pending documents:', pendingError);
+      throw pendingError;
+    }
+
+    console.log(`Found ${pendingDocuments ? pendingDocuments.length : 0} pending documents`);
+
+    // No pending documents, return early
     if (!pendingDocuments || pendingDocuments.length === 0) {
       return new Response(
-        JSON.stringify({ message: 'No pending documents found', count: 0 }),
+        JSON.stringify({ processed: 0, message: 'No pending documents found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    // Process each pending document
-    const results = [];
-    
+
+    // Process each document in sequence
+    const processedDocIds = [];
+    const failedDocIds = [];
+
     for (const doc of pendingDocuments) {
       try {
-        const { data, error } = await supabase.functions.invoke('process-document', {
-          body: { documentId: doc.id }
-        });
+        console.log(`Processing document ${doc.id} (${doc.filename})`);
         
-        results.push({
-          id: doc.id,
-          filename: doc.filename,
-          success: !error,
-          message: error ? error.message : 'Document processing started'
-        });
-      } catch (processError) {
-        results.push({
-          id: doc.id,
-          filename: doc.filename,
-          success: false,
-          message: `Error: ${processError.message}`
-        });
+        // Call the process-document function with the document ID
+        const { error: processError } = await supabase.functions
+          .invoke('process-document', {
+            body: { documentId: doc.id }
+          });
+        
+        if (processError) {
+          console.error(`Error processing document ${doc.id}:`, processError);
+          failedDocIds.push(doc.id);
+        } else {
+          processedDocIds.push(doc.id);
+        }
+      } catch (docError) {
+        console.error(`Error processing document ${doc.id}:`, docError);
+        failedDocIds.push(doc.id);
       }
     }
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        processed: results.length,
-        results 
+      JSON.stringify({
+        processed: processedDocIds.length,
+        failed: failedDocIds.length,
+        message: `Processed ${processedDocIds.length} documents, failed ${failedDocIds.length} documents`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
-    console.error('Error reprocessing documents:', error);
+    console.error('General error in reprocess-documents function:', error);
+    
     return new Response(
-      JSON.stringify({ error: `Failed to reprocess documents: ${error.message}` }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message || 'An unexpected error occurred',
+        processed: 0,
+        failed: 0 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

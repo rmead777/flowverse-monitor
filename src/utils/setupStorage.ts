@@ -4,18 +4,27 @@ import { toast } from '@/hooks/use-toast';
 
 export async function ensureStorageIsSetup() {
   try {
+    console.log('Checking if storage is set up...');
     // Check if the documents bucket exists
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     
-    if (bucketsError) throw bucketsError;
+    if (bucketsError) {
+      console.error('Error listing buckets:', bucketsError);
+      throw bucketsError;
+    }
     
     const documentsExists = buckets.some(bucket => bucket.name === 'documents');
+    console.log('Documents bucket exists:', documentsExists);
     
     if (!documentsExists) {
+      console.log('Creating documents bucket...');
       // Call the setup-storage function to create the bucket
       const { error } = await supabase.functions.invoke('setup-storage');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error invoking setup-storage function:', error);
+        throw error;
+      }
       
       console.log('Documents storage bucket created successfully');
     }
@@ -36,6 +45,14 @@ export async function reprocessPendingDocuments(knowledgeBaseId?: string) {
   try {
     console.log('Reprocessing pending documents for knowledge base:', knowledgeBaseId);
     
+    // First, check if the edge function exists
+    const { data: functions, error: functionsError } = await supabase.functions.listFunctions();
+    if (functionsError) {
+      console.error('Error listing functions:', functionsError);
+    } else {
+      console.log('Available functions:', functions.map(f => f.name).join(', '));
+    }
+    
     const { data, error } = await supabase.functions.invoke('reprocess-documents', {
       body: { knowledgeBaseId }
     });
@@ -52,6 +69,8 @@ export async function reprocessPendingDocuments(knowledgeBaseId?: string) {
         title: 'Document Processing Started',
         description: `${data.processed} documents are being processed`
       });
+    } else {
+      console.log('No documents to process or processing failed');
     }
     
     return data;
