@@ -31,10 +31,20 @@ export async function getKnowledgeBases() {
 
 export async function createKnowledgeBase(name: string, type: KnowledgeBaseType, description: string | null, config: Record<string, any>) {
   try {
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    
     const { data, error } = await supabase
       .from('knowledge_bases')
       .insert([
-        { name, type, description, config }
+        { 
+          name, 
+          type, 
+          description, 
+          config,
+          user_id: user.id 
+        }
       ])
       .select();
       
@@ -100,7 +110,8 @@ export async function getKnowledgeBaseById(id: string) {
 
 export async function uploadDocument(knowledgeBaseId: string, file: File) {
   try {
-    const user = supabase.auth.getUser();
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
     
     // Create a unique path for the file
@@ -124,7 +135,8 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
           file_type: file.type,
           file_size: file.size,
           status: 'pending',
-          metadata: { originalName: file.name }
+          metadata: { originalName: file.name },
+          user_id: user.id
         }
       ])
       .select();
@@ -156,6 +168,10 @@ export async function getDocumentsByKnowledgeBaseId(knowledgeBaseId: string) {
 
 export async function saveApiKey(service: string, name: string, apiKey: string) {
   try {
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    
     // Generate a random initialization vector
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ivString = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -173,7 +189,8 @@ export async function saveApiKey(service: string, name: string, apiKey: string) 
           name,
           encrypted_key: encryptedKey,
           iv: ivString,
-          is_active: true
+          is_active: true,
+          user_id: user.id
         }
       ])
       .select();

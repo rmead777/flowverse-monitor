@@ -16,13 +16,13 @@ const DocumentList = ({ documents, isLoading, onUploadClick }: DocumentListProps
   const { toast } = useToast();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const handleDownload = async (document: DocumentFile) => {
+  const handleDownload = async (doc: DocumentFile) => {
     try {
-      setDownloadingId(document.id);
+      setDownloadingId(doc.id);
       
       const { data, error } = await supabase.storage
         .from('documents')
-        .download(document.file_path);
+        .download(doc.file_path);
         
       if (error) throw error;
       
@@ -30,7 +30,7 @@ const DocumentList = ({ documents, isLoading, onUploadClick }: DocumentListProps
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = document.filename;
+      a.download = doc.filename;
       document.body.appendChild(a);
       a.click();
       URL.revokeObjectURL(url);
@@ -38,7 +38,7 @@ const DocumentList = ({ documents, isLoading, onUploadClick }: DocumentListProps
       
       toast({
         title: 'Download Started',
-        description: `Downloading ${document.filename}`
+        description: `Downloading ${doc.filename}`
       });
     } catch (error) {
       console.error('Error downloading document:', error);
