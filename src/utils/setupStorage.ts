@@ -45,13 +45,8 @@ export async function reprocessPendingDocuments(knowledgeBaseId?: string) {
   try {
     console.log('Reprocessing pending documents for knowledge base:', knowledgeBaseId);
     
-    // First, check if the edge function exists
-    const { data: functions, error: functionsError } = await supabase.functions.listFunctions();
-    if (functionsError) {
-      console.error('Error listing functions:', functionsError);
-    } else {
-      console.log('Available functions:', functions.map(f => f.name).join(', '));
-    }
+    // Removing the call to listFunctions() since it doesn't exist
+    // Instead, we'll just invoke the function directly
     
     const { data, error } = await supabase.functions.invoke('reprocess-documents', {
       body: { knowledgeBaseId }

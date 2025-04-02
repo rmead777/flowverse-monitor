@@ -58,4 +58,5 @@ enable_confirmations = false
 sender_name = "Supabase"
 
 [functions]
-serve_local = true
+# Replace the boolean value with a map as expected
+serve_local = { allowed_http_hosts = ["*"] }
