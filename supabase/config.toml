@@ -57,9 +57,9 @@ enable_confirmations = false
 [auth.email.smtp]
 sender_name = "Supabase"
 
+# Fixed: Corrected the serve_local format
 [functions]
-# Replace the boolean value with a map as expected
-serve_local = { allowed_http_hosts = ["*"] }
+serve_local = true
 
 # Enable debugging for edge functions
 [functions.process-document]

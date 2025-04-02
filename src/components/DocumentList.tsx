@@ -282,6 +282,53 @@ const DocumentList = ({
     }
   };
 
+  const handleReprocessAllDocuments = async () => {
+    if (!knowledgeBaseId) return;
+    
+    try {
+      setIsReprocessingAll(true);
+      
+      const pendingDocs = documents.filter(doc => doc.status === 'pending');
+      if (pendingDocs.length === 0) {
+        toast({
+          title: 'No Pending Documents',
+          description: 'There are no pending documents to reprocess'
+        });
+        return;
+      }
+      
+      const result = await reprocessPendingDocuments(knowledgeBaseId);
+      
+      if (result && result.processed > 0) {
+        toast({
+          title: 'Reprocessing Documents',
+          description: `${result.processed} documents are being reprocessed`,
+        });
+        
+        setTimeout(() => {
+          if (onDocumentDeleted) {
+            onDocumentDeleted();
+          }
+        }, 3000);
+      } else {
+        toast({
+          title: 'No Documents to Process',
+          description: 'There are no pending documents to reprocess',
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error reprocessing documents:', error);
+      toast({
+        title: 'Processing Error',
+        description: 'There was an error reprocessing the documents',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsReprocessingAll(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'processed':
