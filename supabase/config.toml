@@ -65,6 +65,9 @@ verify_jwt = false
 [functions.setup-storage] 
 verify_jwt = false
 
+[functions.create-documents-bucket]
+verify_jwt = false
+
 [functions.vector-search]
 verify_jwt = false
 

@@ -37,17 +37,17 @@ export async function ensureStorageIsSetup() {
       
       // Check if this is an RLS policy error
       if (bucketsError.message && bucketsError.message.includes('Policy')) {
-        console.log('RLS policy error detected. Attempting to call RPC function...');
+        console.log('RLS policy error detected. Attempting to call create_documents_bucket function...');
         
-        // Try to use an RPC function to create the bucket
-        const { data: rpcData, error: rpcError } = await supabase.rpc('create_documents_bucket');
+        // Use a POST request to call the function instead of rpc() to avoid TypeScript errors
+        const { data: rpcData, error: rpcError } = await supabase.functions.invoke('create-documents-bucket');
         
         if (rpcError) {
-          console.error('Error creating bucket via RPC:', rpcError);
-          throw new Error(`RLS policy restriction: ${bucketsError.message}. RPC attempt also failed: ${rpcError.message}`);
+          console.error('Error creating bucket via edge function:', rpcError);
+          throw new Error(`RLS policy restriction: ${bucketsError.message}. Edge function attempt also failed: ${rpcError.message}`);
         }
         
-        console.log('Bucket created via RPC:', rpcData);
+        console.log('Bucket created via edge function:', rpcData);
         return true;
       }
       
@@ -69,17 +69,17 @@ export async function ensureStorageIsSetup() {
         
         // Check if this is an RLS policy error
         if (createError.message && createError.message.includes('Policy')) {
-          console.log('RLS policy error detected. Attempting to call RPC function...');
+          console.log('RLS policy error detected. Attempting to call create_documents_bucket function...');
           
-          // Try to use an RPC function to create the bucket
-          const { data: rpcData, error: rpcError } = await supabase.rpc('create_documents_bucket');
+          // Use a POST request to call the function instead of rpc() to avoid TypeScript errors
+          const { data: rpcData, error: rpcError } = await supabase.functions.invoke('create-documents-bucket');
           
           if (rpcError) {
-            console.error('Error creating bucket via RPC:', rpcError);
-            throw new Error(`RLS policy restriction: ${createError.message}. RPC attempt also failed: ${rpcError.message}`);
+            console.error('Error creating bucket via edge function:', rpcError);
+            throw new Error(`RLS policy restriction: ${createError.message}. Edge function attempt also failed: ${rpcError.message}`);
           }
           
-          console.log('Bucket created via RPC:', rpcData);
+          console.log('Bucket created via edge function:', rpcData);
           return true;
         }
         
