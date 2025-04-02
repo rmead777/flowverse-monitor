@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -220,6 +221,15 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const reactFlowInstance = useReactFlow();
   const flowWrapper = useRef(null);
   
+  // Define saveToUndoHistory before it's used
+  const saveToUndoHistory = useCallback(() => {
+    setUndoStack((stack) => [
+      ...stack,
+      { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }
+    ]);
+    setRedoStack([]);
+  }, [nodes, edges]);
+  
   const ensureNodeProperties = useCallback((nodes: Node[]) => {
     return nodes.map(node => {
       const data = node.data || {};
@@ -335,7 +345,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
       setEdges((eds) => addEdge(newEdge, eds));
       saveToUndoHistory();
     },
-    [setEdges]
+    [setEdges, saveToUndoHistory]
   );
 
   const onEdgeClick = useCallback((event, edge) => {
@@ -371,14 +381,6 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     
     logDeletion();
   }, [setEdges, saveToUndoHistory, toast, user]);
-
-  const saveToUndoHistory = useCallback(() => {
-    setUndoStack((stack) => [
-      ...stack,
-      { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }
-    ]);
-    setRedoStack([]);
-  }, [nodes, edges]);
 
   const undo = useCallback(() => {
     if (undoStack.length === 0) return;
