@@ -38,7 +38,45 @@ serve(async (req) => {
     
     if (bucketsError) {
       console.error("Error listing buckets:", bucketsError);
-      throw bucketsError;
+      
+      // More detailed error logging
+      if (bucketsError.message.includes('Policy')) {
+        console.log("This appears to be a Row Level Security (RLS) policy error.");
+        console.log("Attempting to create bucket with admin privileges...");
+        
+        // Try direct SQL approach with service role to bypass RLS
+        const { error: sqlError } = await supabase.rpc('create_documents_bucket');
+        
+        if (sqlError) {
+          console.error("Error calling create_documents_bucket RPC:", sqlError);
+          throw sqlError;
+        } else {
+          console.log("Successfully created documents bucket via RPC function");
+          
+          // Check if the bucket was created successfully
+          const { data: checkBuckets, error: checkError } = await supabase.storage.listBuckets();
+          
+          if (checkError) {
+            console.error("Error verifying bucket creation:", checkError);
+            throw checkError;
+          }
+          
+          const documentsExists = checkBuckets.some(bucket => bucket.name === 'documents');
+          console.log("Documents bucket exists after RPC call:", documentsExists);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              documentsExists,
+              message: 'Documents bucket created via RPC function',
+              method: 'rpc'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        throw bucketsError;
+      }
     }
     
     let documentsExists = buckets.some(bucket => bucket.name === 'documents');
@@ -56,46 +94,35 @@ serve(async (req) => {
       
       if (createError) {
         console.error("Error creating bucket:", createError);
-        throw createError;
+        
+        // If we get a policy-related error, try the RPC approach
+        if (createError.message.includes('Policy')) {
+          console.log("This appears to be a Row Level Security (RLS) policy error.");
+          console.log("Attempting to create bucket with admin privileges...");
+          
+          // Try direct SQL approach with service role to bypass RLS
+          const { error: sqlError } = await supabase.rpc('create_documents_bucket');
+          
+          if (sqlError) {
+            console.error("Error calling create_documents_bucket RPC:", sqlError);
+            throw sqlError;
+          } else {
+            console.log("Successfully created documents bucket via RPC function");
+            documentsExists = true;
+          }
+        } else {
+          throw createError;
+        }
       }
       
       console.log("Setting up storage policies...");
       // Set up policies to allow authenticated users to access the documents bucket
       try {
         // Create policies for authenticated users
-        await supabase.query(`
-          CREATE POLICY "Allow authenticated users to upload" 
-          ON storage.objects 
-          FOR INSERT 
-          TO authenticated 
-          USING (bucket_id = 'documents' AND auth.uid() = owner);
-          
-          CREATE POLICY "Allow authenticated users to select their files" 
-          ON storage.objects 
-          FOR SELECT 
-          TO authenticated 
-          USING (bucket_id = 'documents' AND auth.uid() = owner);
-          
-          CREATE POLICY "Allow authenticated users to update their files" 
-          ON storage.objects 
-          FOR UPDATE 
-          TO authenticated 
-          USING (bucket_id = 'documents' AND auth.uid() = owner);
-          
-          CREATE POLICY "Allow authenticated users to delete their files" 
-          ON storage.objects 
-          FOR DELETE 
-          TO authenticated 
-          USING (bucket_id = 'documents' AND auth.uid() = owner);
-        `);
-        console.log("Policies created successfully");
+        await supabase.rpc('create_document_storage_policies');
+        console.log("Policies created successfully via RPC");
       } catch (policyError: any) {
-        // If policies already exist, that's fine
-        if (policyError && !policyError.message.includes('already exists')) {
-          console.warn('Policy creation failed:', policyError);
-        } else {
-          console.log("Some policies already exist, continuing...");
-        }
+        console.warn('Policy creation failed:', policyError);
       }
       
       documentsExists = true;
@@ -112,7 +139,11 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Error setting up storage:', error);
     return new Response(
-      JSON.stringify({ error: `Failed to set up storage: ${error.message}` }),
+      JSON.stringify({ 
+        error: `Failed to set up storage: ${error.message}`,
+        details: error.toString(),
+        stack: error.stack
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

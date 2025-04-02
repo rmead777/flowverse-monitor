@@ -12,6 +12,12 @@ export async function ensureStorageIsSetup() {
       
       if (functionError) {
         console.error('Error invoking setup-storage function:', functionError);
+        
+        // Provide more detailed error information
+        if (typeof functionError === 'object' && functionError !== null) {
+          console.error('Error details:', JSON.stringify(functionError, null, 2));
+        }
+        
         // Don't throw here, we'll fall back to direct bucket check
         console.log('Falling back to direct bucket check...');
       } else if (functionData && functionData.success) {
@@ -28,6 +34,23 @@ export async function ensureStorageIsSetup() {
     
     if (bucketsError) {
       console.error('Error listing buckets:', bucketsError);
+      
+      // Check if this is an RLS policy error
+      if (bucketsError.message && bucketsError.message.includes('Policy')) {
+        console.log('RLS policy error detected. Attempting to call RPC function...');
+        
+        // Try to use an RPC function to create the bucket
+        const { data: rpcData, error: rpcError } = await supabase.rpc('create_documents_bucket');
+        
+        if (rpcError) {
+          console.error('Error creating bucket via RPC:', rpcError);
+          throw new Error(`RLS policy restriction: ${bucketsError.message}. RPC attempt also failed: ${rpcError.message}`);
+        }
+        
+        console.log('Bucket created via RPC:', rpcData);
+        return true;
+      }
+      
       throw bucketsError;
     }
     
@@ -43,6 +66,23 @@ export async function ensureStorageIsSetup() {
       
       if (createError) {
         console.error('Error creating documents bucket:', createError);
+        
+        // Check if this is an RLS policy error
+        if (createError.message && createError.message.includes('Policy')) {
+          console.log('RLS policy error detected. Attempting to call RPC function...');
+          
+          // Try to use an RPC function to create the bucket
+          const { data: rpcData, error: rpcError } = await supabase.rpc('create_documents_bucket');
+          
+          if (rpcError) {
+            console.error('Error creating bucket via RPC:', rpcError);
+            throw new Error(`RLS policy restriction: ${createError.message}. RPC attempt also failed: ${rpcError.message}`);
+          }
+          
+          console.log('Bucket created via RPC:', rpcData);
+          return true;
+        }
+        
         throw createError;
       }
       
@@ -54,7 +94,7 @@ export async function ensureStorageIsSetup() {
     console.error('Error setting up storage:', error);
     toast({
       title: 'Storage Setup Error',
-      description: 'There was an error setting up the document storage. Please try again.',
+      description: 'There was an error setting up the document storage. Please check your permissions or contact an administrator.',
       variant: 'destructive'
     });
     return false;
