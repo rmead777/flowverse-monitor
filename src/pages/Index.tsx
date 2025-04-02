@@ -237,6 +237,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="kb" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
+            {/* Ensure we render a component, not an object */}
             <KnowledgeBaseView />
           </TabsContent>
 
