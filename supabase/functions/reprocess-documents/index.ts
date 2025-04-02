@@ -1,4 +1,5 @@
 
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
 // Add CORS headers
@@ -8,7 +9,7 @@ const corsHeaders = {
 };
 
 // Serve the HTTP request
-Deno.serve(async (req) => {
+serve(async (req) => {
   console.log("Reprocess-documents function invoked");
   
   // Handle CORS preflight request
@@ -33,11 +34,12 @@ Deno.serve(async (req) => {
     const { knowledgeBaseId } = await req.json();
     console.log(`Looking for pending documents${knowledgeBaseId ? ` in knowledge base: ${knowledgeBaseId}` : ''}`);
 
-    // Find documents with 'pending' or 'failed' status
+    // Find documents with 'pending', 'failed', or 'processing' status
+    // We include 'processing' to handle cases where the process might have been interrupted
     let query = supabase
       .from('documents')
       .select('id, filename, status')
-      .in('status', ['pending', 'failed']);
+      .in('status', ['pending', 'failed', 'processing']);
     
     // Filter by knowledge base ID if provided
     if (knowledgeBaseId) {
@@ -51,7 +53,7 @@ Deno.serve(async (req) => {
       throw pendingError;
     }
 
-    console.log(`Found ${pendingDocuments ? pendingDocuments.length : 0} pending documents`);
+    console.log(`Found ${pendingDocuments ? pendingDocuments.length : 0} pending/failed documents`);
 
     // No pending documents, return early
     if (!pendingDocuments || pendingDocuments.length === 0) {
@@ -61,7 +63,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Process each document in sequence
+    // Process each document in sequence, with a small delay between each
     const processedDocIds = [];
     const failedDocIds = [];
 
@@ -69,8 +71,16 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing document ${doc.id} (${doc.filename})`);
         
+        // Update document status to pending to ensure it gets processed
+        if (doc.status === 'failed' || doc.status === 'processing') {
+          await supabase
+            .from('documents')
+            .update({ status: 'pending' })
+            .eq('id', doc.id);
+        }
+        
         // Call the process-document function with the document ID
-        const { error: processError } = await supabase.functions
+        const { data, error: processError } = await supabase.functions
           .invoke('process-document', {
             body: { documentId: doc.id }
           });
@@ -80,7 +90,11 @@ Deno.serve(async (req) => {
           failedDocIds.push(doc.id);
         } else {
           processedDocIds.push(doc.id);
+          console.log(`Document ${doc.id} processing initiated successfully:`, data);
         }
+        
+        // Add a small delay between processing documents to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (docError) {
         console.error(`Error processing document ${doc.id}:`, docError);
         failedDocIds.push(doc.id);
@@ -91,7 +105,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         processed: processedDocIds.length,
         failed: failedDocIds.length,
-        message: `Processed ${processedDocIds.length} documents, failed ${failedDocIds.length} documents`
+        message: `Initiated processing for ${processedDocIds.length} documents, failed to initiate for ${failedDocIds.length} documents`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

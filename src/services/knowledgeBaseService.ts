@@ -58,9 +58,29 @@ export async function createKnowledgeBase(name: string, type: KnowledgeBaseType,
 
 export async function updateKnowledgeBase(id: string, updates: Partial<KnowledgeBase>) {
   try {
+    // Make a copy of updates to avoid modifying the original object
+    const updateData = { ...updates };
+    
+    // If config is being updated, merge it with existing config rather than replacing
+    if (updateData.config) {
+      const { data: existingKB, error: fetchError } = await supabase
+        .from('knowledge_bases')
+        .select('config')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      // Merge the configs
+      updateData.config = {
+        ...existingKB.config,
+        ...updateData.config
+      };
+    }
+    
     const { data, error } = await supabase
       .from('knowledge_bases')
-      .update(updates)
+      .update(updateData)
       .eq('id', id)
       .select();
       
@@ -74,6 +94,29 @@ export async function updateKnowledgeBase(id: string, updates: Partial<Knowledge
 
 export async function deleteKnowledgeBase(id: string) {
   try {
+    // First delete all associated documents
+    const { error: docDeleteError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('knowledge_base_id', id);
+      
+    if (docDeleteError) {
+      console.error('Error deleting documents:', docDeleteError);
+      // Continue anyway - we'll try to delete the knowledge base
+    }
+    
+    // Delete all document chunks
+    const { error: chunkDeleteError } = await supabase
+      .from('document_chunks')
+      .delete()
+      .eq('knowledge_base_id', id);
+      
+    if (chunkDeleteError) {
+      console.error('Error deleting document chunks:', chunkDeleteError);
+      // Continue anyway
+    }
+    
+    // Finally delete the knowledge base
     const { error } = await supabase
       .from('knowledge_bases')
       .delete()
@@ -115,7 +158,7 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
     if (!user) throw new Error("User not authenticated");
     
     // Create a unique path for the file
-    const filePath = `${knowledgeBaseId}/${uuidv4()}-${file.name}`;
+    const filePath = `${knowledgeBaseId}/${uuidv4()}-${file.name.replace(/[^a-zA-Z0-9.-_]/g, '_')}`;
     
     // Upload file to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -135,7 +178,11 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
           file_type: file.type,
           file_size: file.size,
           status: 'pending',
-          metadata: { originalName: file.name },
+          metadata: { 
+            originalName: file.name,
+            uploadDate: new Date().toISOString(),
+            fileType: file.type
+          },
           user_id: user.id
         }
       ])
@@ -152,6 +199,17 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
     if (processError) {
       console.error('Error processing document:', processError);
       // Don't throw here, as the document was uploaded successfully
+      // Instead, update the document status to indicate the processing error
+      await supabase
+        .from('documents')
+        .update({ 
+          status: 'failed',
+          metadata: {
+            ...documentData[0].metadata,
+            processingError: processError.message
+          }
+        })
+        .eq('id', documentData[0].id);
     }
     
     return documentData[0] as DocumentFile;
@@ -183,14 +241,9 @@ export async function saveApiKey(service: string, name: string, apiKey: string) 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
     
-    // Generate a random initialization vector
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ivString = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
-    
     // In a real application, we would encrypt the API key here
-    // For simplicity, we're just storing it as is (not secure for production)
-    // This should be replaced with proper encryption in a real application
-    const encryptedKey = apiKey;
+    // For this implementation, we'll store it directly
+    // This is not secure for production but works for demo purposes
     
     const { data, error } = await supabase
       .from('api_keys')
@@ -198,8 +251,8 @@ export async function saveApiKey(service: string, name: string, apiKey: string) 
         {
           service,
           name,
-          encrypted_key: encryptedKey,
-          iv: ivString,
+          encrypted_key: apiKey,
+          iv: 'demo', // In a real app, generate a random IV
           is_active: true,
           user_id: user.id
         }
@@ -262,13 +315,22 @@ export async function listPineconeIndexes(): Promise<PineconeIndex[]> {
       
     if (error) throw error;
     
-    // Ensure we return an array even if the API returns unexpected data
-    if (!data || !Array.isArray(data)) {
-      console.error("Unexpected response format from pinecone-operations:", data);
+    // Handle various response formats
+    if (!data) {
+      console.error("Empty response from pinecone-operations");
       return [];
     }
     
-    return data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    if (data.indexes && Array.isArray(data.indexes)) {
+      return data.indexes;
+    }
+    
+    console.error("Unexpected response format from pinecone-operations:", data);
+    return [];
   } catch (error) {
     console.error('Error listing Pinecone indexes:', error);
     // Return empty array on error to prevent UI crashes
@@ -346,12 +408,25 @@ export async function listPineconeNamespaces(indexName: string): Promise<{ names
     if (error) throw error;
     
     // Make sure we have a properly formatted response
-    if (!data || !Array.isArray(data.namespaces)) {
-      console.error("Unexpected namespace response format:", data);
+    if (!data) {
+      console.error("Empty response from listPineconeNamespaces");
       return { namespaces: [], stats: {} };
     }
     
-    return data;
+    if (Array.isArray(data.namespaces)) {
+      return data;
+    }
+    
+    // Try to extract namespaces from the response if they're not in the expected format
+    if (data.stats && data.stats.namespaces) {
+      return { 
+        namespaces: Object.keys(data.stats.namespaces),
+        stats: data.stats
+      };
+    }
+    
+    console.error("Unexpected namespace response format:", data);
+    return { namespaces: [], stats: {} };
   } catch (error) {
     console.error('Error listing Pinecone namespaces:', error);
     // Return safe defaults on error
@@ -378,7 +453,7 @@ export async function getPineconeStats(indexName: string, namespace?: string): P
   }
 }
 
-export async function transferToPinecone(knowledgeBaseId: string, indexName: string, namespace: string): Promise<{ success: boolean }> {
+export async function transferToPinecone(knowledgeBaseId: string, indexName: string, namespace: string): Promise<{ success: boolean; totalChunks?: number; knowledgeBaseId: string }> {
   try {
     const { data, error } = await supabase.functions
       .invoke('pinecone-operations', {
@@ -391,7 +466,12 @@ export async function transferToPinecone(knowledgeBaseId: string, indexName: str
       });
       
     if (error) throw error;
-    return data;
+    
+    // Make sure to add knowledgeBaseId to the response for later use
+    return {
+      ...data,
+      knowledgeBaseId
+    };
   } catch (error) {
     console.error('Error transferring to Pinecone:', error);
     throw error;

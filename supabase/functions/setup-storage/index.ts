@@ -53,14 +53,35 @@ serve(async (req) => {
         throw createError;
       }
       
-      // Set bucket policies
-      const { error: policyError } = await supabase
-        .storage
-        .from('documents')
-        .createSignedUploadUrl('test.txt');
+      // Set up a policy to allow authenticated users to upload files
+      const { error: policyError } = await supabase.query(`
+        CREATE POLICY "Allow authenticated users to upload" 
+        ON storage.objects 
+        FOR INSERT 
+        TO authenticated 
+        USING (bucket_id = 'documents' AND auth.uid() = owner);
+        
+        CREATE POLICY "Allow authenticated users to select their files" 
+        ON storage.objects 
+        FOR SELECT 
+        TO authenticated 
+        USING (bucket_id = 'documents' AND auth.uid() = owner);
+        
+        CREATE POLICY "Allow authenticated users to update their files" 
+        ON storage.objects 
+        FOR UPDATE 
+        TO authenticated 
+        USING (bucket_id = 'documents' AND auth.uid() = owner);
+        
+        CREATE POLICY "Allow authenticated users to delete their files" 
+        ON storage.objects 
+        FOR DELETE 
+        TO authenticated 
+        USING (bucket_id = 'documents' AND auth.uid() = owner);
+      `);
       
       if (policyError && !policyError.message.includes('already exists')) {
-        console.warn('Policy may need to be set up manually:', policyError);
+        console.warn('Policy creation failed:', policyError);
       }
       
       documentsExists = true;

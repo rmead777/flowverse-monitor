@@ -57,11 +57,11 @@ enable_confirmations = false
 [auth.email.smtp]
 sender_name = "Supabase"
 
-# Fixed: Corrected the serve_local format
+# Serve all Edge Functions locally
 [functions]
 serve_local = true
 
-# Enable debugging for edge functions
+# Disable JWT verification for all Edge Functions by default
 [functions.process-document]
 verify_jwt = false
 
@@ -69,4 +69,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.setup-storage] 
+verify_jwt = false
+
+[functions.vector-search]
+verify_jwt = false
+
+[functions.pinecone-operations]
 verify_jwt = false

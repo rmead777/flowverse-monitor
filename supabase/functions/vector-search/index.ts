@@ -1,8 +1,9 @@
 
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
 
 // Define the function handler
-Deno.serve(async (req: Request) => {
+serve(async (req: Request) => {
   // Set up CORS headers
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -70,12 +71,23 @@ Deno.serve(async (req: Request) => {
     
     // Generate embedding for the query
     const embedding = await generateEmbedding(query, embeddingModel);
+    
+    if (!embedding) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to generate embedding for the query" 
+        }),
+        { headers: corsHeaders, status: 500 }
+      );
+    }
 
     // Perform search based on knowledge base type
     let results = [];
     
-    if (knowledgeBase.type === 'pinecone') {
-      console.log("Using Pinecone search");
+    if (knowledgeBase.type === 'pinecone' && 
+        knowledgeBase.config?.pineconeIndex && 
+        knowledgeBase.config?.environment) {
+      console.log("Using Pinecone search with index:", knowledgeBase.config.pineconeIndex);
       // Search using Pinecone
       results = await searchPinecone(
         knowledgeBase,
@@ -176,42 +188,43 @@ async function searchSupabase(
     });
   }
 
+  console.log("Querying with match condition:", matchCondition);
+
   try {
-    // First check if the match_document_chunks function exists
-    const { data: funcExists, error: funcCheckError } = await supabase.rpc(
-      'match_document_chunks',
-      {
-        query_embedding: embedding,
-        match_threshold: similarityThreshold,
-        match_count: limit,
-        match_condition: matchCondition
+    // Try to use the match_documents RPC function if available
+    try {
+      const { data: rpcResults, error: rpcError } = await supabase.rpc(
+        'match_documents',
+        {
+          query_embedding: embedding,
+          match_threshold: similarityThreshold,
+          match_count: limit,
+          filter_expression: matchCondition
+        }
+      );
+      
+      if (!rpcError && rpcResults) {
+        console.log(`Found ${rpcResults.length} results using match_documents RPC`);
+        return rpcResults;
       }
-    );
-
-    if (funcCheckError && funcCheckError.message.includes('does not exist')) {
-      // If the function doesn't exist, fallback to direct query
-      console.log('match_document_chunks function does not exist, using direct query instead');
-
-      const { data: chunks, error: directQueryError } = await supabase
-        .from('document_chunks')
-        .select('id, content, document_id, knowledge_base_id, metadata')
-        .eq('knowledge_base_id', knowledgeBaseId)
-        .limit(limit);
-
-      if (directQueryError) {
-        console.error("Error in direct document_chunks query:", directQueryError);
-        throw directQueryError;
-      }
-
-      // Since we can't do similarity search without the function, just return all chunks
-      return chunks || [];
-    } else if (funcCheckError) {
-      console.error("Error checking match_document_chunks function:", funcCheckError);
-      throw funcCheckError;
+    } catch (rpcError) {
+      console.log("RPC method not available, falling back to direct query:", rpcError.message);
     }
 
-    // If we got here, the function exists and we got results
-    return funcExists || [];
+    // Fall back to direct query if the RPC function isn't available
+    const { data: chunks, error: directQueryError } = await supabase
+      .from('document_chunks')
+      .select('id, content, document_id, knowledge_base_id, metadata')
+      .eq('knowledge_base_id', knowledgeBaseId)
+      .limit(limit);
+
+    if (directQueryError) {
+      console.error("Error in direct document_chunks query:", directQueryError);
+      throw directQueryError;
+    }
+
+    console.log(`Found ${chunks?.length || 0} results using direct query`);
+    return chunks || [];
   } catch (error) {
     console.error("Error in Supabase vector search:", error);
     // Return empty results rather than failing completely
@@ -234,33 +247,22 @@ async function searchPinecone(
     }
 
     const indexName = knowledgeBase.config?.pineconeIndex;
-    const namespace = knowledgeBase.config?.pineconeNamespace || "";
+    const environment = knowledgeBase.config?.environment;
+    const namespace = knowledgeBase.config?.namespace || "";
     
     if (!indexName) {
       throw new Error("Pinecone index name not found in knowledge base config");
     }
 
-    // Get index description to get the host
-    const describeResponse = await fetch(`https://api.pinecone.io/indexes/${indexName}`, {
-      method: "GET",
-      headers: {
-        "Api-Key": pineconeApiKey,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!describeResponse.ok) {
-      const errorText = await describeResponse.text();
-      throw new Error(`API request failed with status ${describeResponse.status}: ${errorText}`);
+    if (!environment) {
+      throw new Error("Pinecone environment not found in knowledge base config");
     }
 
-    const indexData = await describeResponse.json();
-    const host = indexData.host;
+    console.log(`Searching Pinecone index: ${indexName}, environment: ${environment}, namespace: ${namespace}`);
+
+    // Build the host URL
+    const host = `${indexName}-${environment}.svc.${environment}.pinecone.io`;
     
-    if (!host) {
-      throw new Error(`No host found for index ${indexName}`);
-    }
-
     // Build filter if any
     const metadataFilter: Record<string, any> = {};
     if (filters && typeof filters === 'object') {
@@ -272,17 +274,28 @@ async function searchPinecone(
       });
     }
 
+    // Always include knowledge_base_id in the filter
+    metadataFilter.knowledge_base_id = knowledgeBase.id;
+
+    console.log("Pinecone metadata filter:", metadataFilter);
+
     // Query the Pinecone index
     const requestBody: any = {
       vector: embedding,
       topK: limit,
       includeMetadata: true,
-      namespace
+      includeValues: false
     };
 
-    if (Object.keys(metadataFilter).length > 0) {
-      requestBody.filter = metadataFilter;
+    if (namespace) {
+      requestBody.namespace = namespace;
     }
+
+    if (Object.keys(metadataFilter).length > 0) {
+      requestBody.filter = { $and: [metadataFilter] };
+    }
+
+    console.log(`Querying Pinecone at https://${host}/query with:`, JSON.stringify(requestBody));
 
     const searchResponse = await fetch(`https://${host}/query`, {
       method: "POST",
@@ -295,20 +308,21 @@ async function searchPinecone(
 
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
-      throw new Error(`Search request failed with status ${searchResponse.status}: ${errorText}`);
+      throw new Error(`Pinecone search request failed with status ${searchResponse.status}: ${errorText}`);
     }
 
     const searchData = await searchResponse.json();
+    console.log(`Pinecone returned ${searchData.matches?.length || 0} matches`);
     
     // Convert Pinecone results to our standard format
     return (searchData.matches || [])
       .filter((match: any) => match.score >= similarityThreshold)
       .map((match: any) => ({
         id: match.id,
-        content: match.metadata.content,
-        document_id: match.metadata.document_id,
+        content: match.metadata?.content || "",
+        document_id: match.metadata?.document_id || null,
         knowledge_base_id: knowledgeBase.id,
-        metadata: match.metadata,
+        metadata: match.metadata || {},
         similarity: match.score,
         document: null  // Will be populated later
       }));
@@ -319,7 +333,7 @@ async function searchPinecone(
 }
 
 // Function to generate embeddings using the appropriate API
-async function generateEmbedding(text: string, model: string): Promise<number[]> {
+async function generateEmbedding(text: string, model: string): Promise<number[] | null> {
   console.log(`Generating embedding using model: ${model}`);
   
   let endpoint = 'https://api.openai.com/v1/embeddings';
@@ -333,28 +347,29 @@ async function generateEmbedding(text: string, model: string): Promise<number[]>
   };
   
   // Handle different embedding models
-  if (model === 'voyage-finance-2' || model === 'voyage-3-large') {
+  if (model.startsWith('voyage-')) {
     // For Voyage AI models
     const voyageApiKey = Deno.env.get("VOYAGE_API_KEY");
     
     if (!voyageApiKey) {
-      throw new Error('VOYAGE_API_KEY is not set');
+      console.error('VOYAGE_API_KEY is not set, falling back to OpenAI');
+      model = 'text-embedding-ada-002';
+    } else {
+      endpoint = 'https://api.voyageai.com/v1/embeddings';
+      headers = {
+        'Authorization': `Bearer ${voyageApiKey}`,
+        'Content-Type': 'application/json',
+      };
+      body = {
+        input: text,
+        model: model,
+        dimensions: 1536 // Match OpenAI's dimensions for compatibility
+      };
     }
-    
-    endpoint = 'https://api.voyageai.com/v1/embeddings';
-    headers = {
-      'Authorization': `Bearer ${voyageApiKey}`,
-      'Content-Type': 'application/json',
-    };
-    body = {
-      input: text,
-      model: model,
-      dimensions: 1536 // Match OpenAI's dimensions for compatibility
-    };
   }
 
   try {
-    console.log(`Making request to ${endpoint}`);
+    console.log(`Making request to ${endpoint} with model ${model}`);
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: headers,
@@ -369,14 +384,14 @@ async function generateEmbedding(text: string, model: string): Promise<number[]>
     const result = await response.json();
     console.log("Embedding generated successfully");
     
-    // Handle different API response formats
-    if (model === 'voyage-finance-2' || model === 'voyage-3-large') {
-      return result.data[0].embedding;
-    } else {
-      return result.data[0].embedding;
+    if (!result.data || !result.data[0] || !result.data[0].embedding) {
+      console.error("Invalid embedding response format:", result);
+      return null;
     }
+    
+    return result.data[0].embedding;
   } catch (error) {
     console.error(`Error generating embedding with model ${model}:`, error);
-    throw error;
+    return null;
   }
 }

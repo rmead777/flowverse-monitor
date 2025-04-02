@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { KnowledgeBase, DocumentFile, KnowledgeBaseType, PineconeIndex } from '@/types/knowledgeBase';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +35,8 @@ export function useKnowledgeBase() {
     refetch: refetchKnowledgeBases
   } = useQuery({
     queryKey: ['knowledgeBases'],
-    queryFn: getKnowledgeBases
+    queryFn: getKnowledgeBases,
+    refetchInterval: 10000 // Refresh every 10 seconds to check for status updates
   });
   
   // Get a single knowledge base by ID
@@ -42,7 +44,8 @@ export function useKnowledgeBase() {
     return useQuery({
       queryKey: ['knowledgeBase', id],
       queryFn: () => getKnowledgeBaseById(id),
-      enabled: !!id
+      enabled: !!id,
+      refetchInterval: 5000 // Refresh every 5 seconds for real-time updates
     });
   };
   
@@ -51,7 +54,8 @@ export function useKnowledgeBase() {
     return useQuery({
       queryKey: ['documents', knowledgeBaseId],
       queryFn: () => getDocumentsByKnowledgeBaseId(knowledgeBaseId),
-      enabled: !!knowledgeBaseId
+      enabled: !!knowledgeBaseId,
+      refetchInterval: 5000 // Refresh every 5 seconds for document status updates
     });
   };
   
@@ -188,7 +192,11 @@ export function useKnowledgeBase() {
   
   // List Pinecone indexes
   const listPineconeIndexesMutation = useMutation({
-    mutationFn: () => listPineconeIndexes(),
+    mutationFn: (callback?: (indexes: PineconeIndex[]) => void) => 
+      listPineconeIndexes().then(indexes => {
+        if (callback) callback(indexes);
+        return indexes;
+      }),
     onError: (error: any) => {
       toast({
         title: 'Error Listing Pinecone Indexes',
@@ -214,7 +222,7 @@ export function useKnowledgeBase() {
     onSuccess: () => {
       toast({
         title: 'Pinecone Index Created',
-        description: 'Your Pinecone index has been created successfully.',
+        description: 'Your Pinecone index creation has been initiated. This may take a few minutes to complete.',
       });
     },
     onError: (error: any) => {
@@ -258,7 +266,11 @@ export function useKnowledgeBase() {
   
   // List Pinecone namespaces
   const listPineconeNamespacesMutation = useMutation({
-    mutationFn: (indexName: string) => listPineconeNamespaces(indexName),
+    mutationFn: (indexName: string, callback?: (data: any) => void) => 
+      listPineconeNamespaces(indexName).then(data => {
+        if (callback) callback(data);
+        return data;
+      }),
     onError: (error: any) => {
       toast({
         title: 'Error Listing Pinecone Namespaces',
@@ -292,11 +304,17 @@ export function useKnowledgeBase() {
       indexName: string; 
       namespace: string;
     }) => transferToPinecone(knowledgeBaseId, indexName, namespace),
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: 'Transfer Started',
-        description: 'Your documents are being transferred to Pinecone. This may take a few minutes.',
+        description: `${data.totalChunks || 'Your'} documents are being transferred to Pinecone. This may take a few minutes.`,
       });
+      
+      // Invalidate queries after a short delay to refresh the UI
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['knowledgeBases'] });
+        queryClient.invalidateQueries({ queryKey: ['knowledgeBase', data.knowledgeBaseId] });
+      }, 1000);
     },
     onError: (error: any) => {
       toast({
@@ -312,8 +330,10 @@ export function useKnowledgeBase() {
     mutationFn: (knowledgeBaseId?: string) => reprocessPendingDocuments(knowledgeBaseId),
     onSuccess: (data) => {
       if (data?.processed > 0) {
+        // Invalidate document queries after a delay to give time for processing to start
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['documents'] });
+          queryClient.invalidateQueries({ queryKey: ['knowledgeBases'] });
         }, 3000);
       }
     }
