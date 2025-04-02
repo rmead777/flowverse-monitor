@@ -207,6 +207,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [flowConfigurations, setFlowConfigurations] = useState<FlowConfigurationType[]>([]);
@@ -285,7 +286,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
       };
     });
   }, []);
-  
+
   useEffect(() => {
     if (initialFlowData) {
       if (initialFlowData.nodes && initialFlowData.nodes.length > 0) {
@@ -337,6 +338,40 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
     [setEdges]
   );
 
+  const onEdgeClick = useCallback((event, edge) => {
+    setSelectedEdge(edge);
+  }, []);
+
+  const deleteEdge = useCallback((edgeId) => {
+    saveToUndoHistory();
+    
+    setEdges(edges => edges.filter(edge => edge.id !== edgeId));
+    setSelectedEdge(null);
+    
+    toast({
+      title: "Connection Deleted",
+      description: "Successfully removed the connection",
+    });
+    
+    const logDeletion = async () => {
+      try {
+        if (!user) return;
+        
+        await supabase
+          .from('agent_logs')
+          .insert([{
+            agent_name: 'Edge',
+            event_type: 'edge_deleted',
+            details: { edge_id: edgeId }
+          }]);
+      } catch (err) {
+        console.error('Error logging edge deletion:', err);
+      }
+    };
+    
+    logDeletion();
+  }, [setEdges, saveToUndoHistory, toast, user]);
+
   const saveToUndoHistory = useCallback(() => {
     setUndoStack((stack) => [
       ...stack,
@@ -374,6 +409,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const onNodeClick = useCallback((event, node) => {
     const enhancedNode = ensureNodeProperties([node])[0];
     setSelectedNode(enhancedNode);
+    setSelectedEdge(null);
     if (onNodeSelect) {
       onNodeSelect(enhancedNode);
     }
@@ -887,6 +923,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
               nodeTypes={nodeTypes}
               connectionLineType={ConnectionLineType.SmoothStep}
               onDragOver={onDragOver}
@@ -1011,25 +1048,41 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
             </ReactFlow>
           </ContextMenuTrigger>
           <ContextMenuContent>
-            <ContextMenuItem
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => {
-                const selectedNode = nodes.find(node => node.selected);
-                if (selectedNode) {
-                  deleteNode(selectedNode.id);
-                }
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Node
-            </ContextMenuItem>
-            <ContextMenuItem
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={autoLayout}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Auto Layout
-            </ContextMenuItem>
+            {selectedEdge ? (
+              <ContextMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  if (selectedEdge) {
+                    deleteEdge(selectedEdge.id);
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Connection
+              </ContextMenuItem>
+            ) : (
+              <>
+                <ContextMenuItem
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={() => {
+                    const selectedNode = nodes.find(node => node.selected);
+                    if (selectedNode) {
+                      deleteNode(selectedNode.id);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Node
+                </ContextMenuItem>
+                <ContextMenuItem
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={autoLayout}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Auto Layout
+                </ContextMenuItem>
+              </>
+            )}
           </ContextMenuContent>
         </ContextMenu>
       </div>
