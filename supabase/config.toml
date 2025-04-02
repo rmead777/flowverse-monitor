@@ -56,8 +56,14 @@ enable_confirmations = false
 # Configure SMTP settings for the Auth server
 [auth.email.smtp]
 sender_name = "Supabase"
+sender_address = "noreply@example.com"
+host = "mail.example.com"
+port = "587"
+username = "smtp_username"
+password = "smtp_password"
+method = "ssl"
 
-# Define serve_local for all Edge Functions as proper sections, not a boolean
+# Define functions configuration
 [functions]
 
 [functions.process-document]
