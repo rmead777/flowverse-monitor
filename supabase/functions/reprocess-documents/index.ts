@@ -1,135 +1,101 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.5";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-// Add CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
-// Serve the HTTP request
 serve(async (req) => {
-  console.log("Reprocess-documents function invoked");
-  
-  // Handle CORS preflight request
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
+  // Get the request body
+  let reqBody;
   try {
-    // Get env variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    // Validate env variables
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing environment variables');
-      throw new Error('Missing environment variables');
-    }
+    reqBody = await req.json();
+  } catch (error) {
+    reqBody = {};
+  }
 
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const { knowledgeBaseId } = reqBody;
 
-    // Parse request body
-    let knowledgeBaseId;
-    try {
-      const body = await req.json();
-      knowledgeBaseId = body.knowledgeBaseId;
-      console.log(`Looking for pending documents${knowledgeBaseId ? ` in knowledge base: ${knowledgeBaseId}` : ''}`);
-    } catch (e) {
-      console.log("No request body or invalid JSON, proceeding without knowledge base filter");
-    }
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Find documents with 'pending', 'failed', or 'processing' status
-    // We include 'processing' to handle cases where the process might have been interrupted
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'Missing server environment variables' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Initialize Supabase client with service role for admin privileges
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  try {
+    console.log("Finding pending documents...");
     let query = supabase
       .from('documents')
-      .select('id, filename, status')
-      .in('status', ['pending', 'failed', 'processing']);
-    
-    // Filter by knowledge base ID if provided
+      .select('id, filename')
+      .eq('status', 'pending');
+
+    // If knowledge base ID is provided, filter by it
     if (knowledgeBaseId) {
       query = query.eq('knowledge_base_id', knowledgeBaseId);
     }
 
-    const { data: pendingDocuments, error: pendingError } = await query;
+    const { data: documents, error } = await query;
 
-    if (pendingError) {
-      console.error('Error finding pending documents:', pendingError);
-      throw pendingError;
+    if (error) {
+      throw error;
     }
 
-    console.log(`Found ${pendingDocuments ? pendingDocuments.length : 0} pending/failed documents`);
-
-    // No pending documents, return early
-    if (!pendingDocuments || pendingDocuments.length === 0) {
+    // Only process if we find pending documents
+    if (!documents || documents.length === 0) {
       return new Response(
-        JSON.stringify({ processed: 0, message: 'No pending documents found' }),
+        JSON.stringify({ 
+          success: true, 
+          processed: 0, 
+          message: 'No pending documents found' 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Process each document in sequence, with a small delay between each
-    const processedDocIds = [];
-    const failedDocIds = [];
+    console.log(`Found ${documents.length} pending documents to process`);
 
-    for (const doc of pendingDocuments) {
-      try {
-        console.log(`Processing document ${doc.id} (${doc.filename})`);
-        
-        // Update document status to pending to ensure it gets processed
-        if (doc.status === 'failed' || doc.status === 'processing') {
-          await supabase
-            .from('documents')
-            .update({ status: 'pending' })
-            .eq('id', doc.id);
-        }
-        
-        // Call the process-document function with the document ID
-        const { data, error: processError } = await supabase.functions
-          .invoke('process-document', {
-            body: { documentId: doc.id }
-          });
-        
-        if (processError) {
-          console.error(`Error processing document ${doc.id}:`, processError);
-          failedDocIds.push(doc.id);
-        } else {
-          processedDocIds.push(doc.id);
-          console.log(`Document ${doc.id} processing initiated successfully:`, data);
-        }
-        
-        // Add a small delay between processing documents to avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (docError) {
-        console.error(`Error processing document ${doc.id}:`, docError);
-        failedDocIds.push(doc.id);
+    for (const doc of documents) {
+      console.log(`Triggering processing for document: ${doc.id} (${doc.filename})`);
+      // Call the process-document function for each pending document
+      const { data, error: processError } = await supabase.functions.invoke('process-document', {
+        body: { documentId: doc.id }
+      });
+
+      if (processError) {
+        console.error(`Error processing document ${doc.id}:`, processError);
+      } else {
+        console.log(`Started processing for document ${doc.id}:`, data);
       }
     }
 
     return new Response(
       JSON.stringify({
-        processed: processedDocIds.length,
-        failed: failedDocIds.length,
-        message: `Initiated processing for ${processedDocIds.length} documents, failed to initiate for ${failedDocIds.length} documents`
+        success: true,
+        processed: documents.length,
+        message: `Processing started for ${documents.length} document(s)`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error: any) {
-    console.error('General error in reprocess-documents function:', error);
-    
+    console.error('Error reprocessing documents:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred',
-        processed: 0,
-        failed: 0 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: `Failed to reprocess documents: ${error.message}` }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
