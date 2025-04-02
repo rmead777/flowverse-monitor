@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import FlowView from "@/components/FlowView";
@@ -77,7 +76,6 @@ const Index = () => {
     }
   }, [user, toast]);
 
-  // Load flow configurations on component mount if user is logged in
   useEffect(() => {
     if (user) {
       fetchFlowConfigurations();
@@ -237,77 +235,19 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="kb" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
-            {/* Ensure we render a component, not an object */}
             <KnowledgeBaseView />
           </TabsContent>
 
           <TabsContent value="metrics" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
             <MetricsDashboardView />
-            <div className="mt-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger className="text-white hover:text-black hover:bg-white px-3 py-1.5 rounded">
-                  Metrics Options
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem 
-                    className="text-white hover:text-black hover:bg-white cursor-pointer"
-                  >
-                    Export Data
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-white hover:text-black hover:bg-white cursor-pointer"
-                  >
-                    Refresh Metrics
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </TabsContent>
 
           <TabsContent value="logs" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
             <LogsView />
-            <div className="mt-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger className="text-white hover:text-black hover:bg-white px-3 py-1.5 rounded">
-                  Log Options
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem 
-                    className="text-white hover:text-black hover:bg-white cursor-pointer"
-                  >
-                    Filter Logs
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-white hover:text-black hover:bg-white cursor-pointer"
-                  >
-                    Download Logs
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </TabsContent>
 
           <TabsContent value="feedback" className="flex-1 overflow-auto m-0 p-4 data-[state=inactive]:hidden">
             <FeedbackAnalysisView />
-            <div className="mt-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger className="text-white hover:text-black hover:bg-white px-3 py-1.5 rounded">
-                  Feedback Options
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem 
-                    className="text-white hover:text-black hover:bg-white cursor-pointer"
-                  >
-                    Filter Feedback
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-white hover:text-black hover:bg-white cursor-pointer"
-                  >
-                    Export Feedback
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </TabsContent>
         </Tabs>
       </div>
