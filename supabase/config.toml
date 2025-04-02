@@ -53,16 +53,6 @@ double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
 enable_confirmations = false
 
-# Configure SMTP settings for the Auth server
-[auth.email.smtp]
-sender_name = "Supabase"
-sender_address = "noreply@example.com"
-host = "mail.example.com"
-port = "587"
-username = "smtp_username"
-password = "smtp_password"
-method = "ssl"
-
 # Define functions configuration
 [functions]
 
