@@ -221,7 +221,7 @@ const FlowView = ({ onNodeSelect, initialFlowData }: FlowViewProps) => {
   const reactFlowInstance = useReactFlow();
   const flowWrapper = useRef(null);
   
-  // Define saveToUndoHistory before it's used
+  // Define saveToUndoHistory function first before using it in any other hooks
   const saveToUndoHistory = useCallback(() => {
     setUndoStack((stack) => [
       ...stack,
