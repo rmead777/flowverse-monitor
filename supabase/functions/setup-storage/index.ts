@@ -29,19 +29,23 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   
   try {
+    console.log("Checking if documents bucket exists...");
     // Check if the documents bucket exists
     const { data: buckets, error: bucketsError } = await supabase
       .storage
       .listBuckets();
     
     if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
       throw bucketsError;
     }
     
     let documentsExists = buckets.some(bucket => bucket.name === 'documents');
+    console.log("Documents bucket exists:", documentsExists);
     
     // Create the documents bucket if it doesn't exist
     if (!documentsExists) {
+      console.log("Creating documents bucket...");
       const { error: createError } = await supabase
         .storage
         .createBucket('documents', {
@@ -50,38 +54,47 @@ serve(async (req) => {
         });
       
       if (createError) {
+        console.error("Error creating bucket:", createError);
         throw createError;
       }
       
-      // Set up a policy to allow authenticated users to upload files
-      const { error: policyError } = await supabase.query(`
-        CREATE POLICY "Allow authenticated users to upload" 
-        ON storage.objects 
-        FOR INSERT 
-        TO authenticated 
-        USING (bucket_id = 'documents' AND auth.uid() = owner);
-        
-        CREATE POLICY "Allow authenticated users to select their files" 
-        ON storage.objects 
-        FOR SELECT 
-        TO authenticated 
-        USING (bucket_id = 'documents' AND auth.uid() = owner);
-        
-        CREATE POLICY "Allow authenticated users to update their files" 
-        ON storage.objects 
-        FOR UPDATE 
-        TO authenticated 
-        USING (bucket_id = 'documents' AND auth.uid() = owner);
-        
-        CREATE POLICY "Allow authenticated users to delete their files" 
-        ON storage.objects 
-        FOR DELETE 
-        TO authenticated 
-        USING (bucket_id = 'documents' AND auth.uid() = owner);
-      `);
-      
-      if (policyError && !policyError.message.includes('already exists')) {
-        console.warn('Policy creation failed:', policyError);
+      console.log("Setting up storage policies...");
+      // Set up policies to allow authenticated users to access the documents bucket
+      try {
+        // Create policies for authenticated users
+        await supabase.query(`
+          CREATE POLICY "Allow authenticated users to upload" 
+          ON storage.objects 
+          FOR INSERT 
+          TO authenticated 
+          USING (bucket_id = 'documents' AND auth.uid() = owner);
+          
+          CREATE POLICY "Allow authenticated users to select their files" 
+          ON storage.objects 
+          FOR SELECT 
+          TO authenticated 
+          USING (bucket_id = 'documents' AND auth.uid() = owner);
+          
+          CREATE POLICY "Allow authenticated users to update their files" 
+          ON storage.objects 
+          FOR UPDATE 
+          TO authenticated 
+          USING (bucket_id = 'documents' AND auth.uid() = owner);
+          
+          CREATE POLICY "Allow authenticated users to delete their files" 
+          ON storage.objects 
+          FOR DELETE 
+          TO authenticated 
+          USING (bucket_id = 'documents' AND auth.uid() = owner);
+        `);
+        console.log("Policies created successfully");
+      } catch (policyError: any) {
+        // If policies already exist, that's fine
+        if (policyError && !policyError.message.includes('already exists')) {
+          console.warn('Policy creation failed:', policyError);
+        } else {
+          console.log("Some policies already exist, continuing...");
+        }
       }
       
       documentsExists = true;
@@ -95,7 +108,7 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error setting up storage:', error);
     return new Response(
       JSON.stringify({ error: `Failed to set up storage: ${error.message}` }),

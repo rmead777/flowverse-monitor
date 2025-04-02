@@ -192,11 +192,9 @@ export function useKnowledgeBase() {
   
   // List Pinecone indexes
   const listPineconeIndexesMutation = useMutation({
-    mutationFn: (callback?: (indexes: PineconeIndex[]) => void) => 
-      listPineconeIndexes().then(indexes => {
-        if (callback) callback(indexes);
-        return indexes;
-      }),
+    mutationFn: async () => {
+      return await listPineconeIndexes();
+    },
     onError: (error: any) => {
       toast({
         title: 'Error Listing Pinecone Indexes',
@@ -266,11 +264,9 @@ export function useKnowledgeBase() {
   
   // List Pinecone namespaces
   const listPineconeNamespacesMutation = useMutation({
-    mutationFn: (indexName: string, callback?: (data: any) => void) => 
-      listPineconeNamespaces(indexName).then(data => {
-        if (callback) callback(data);
-        return data;
-      }),
+    mutationFn: async (indexName: string) => {
+      return await listPineconeNamespaces(indexName);
+    },
     onError: (error: any) => {
       toast({
         title: 'Error Listing Pinecone Namespaces',
@@ -339,6 +335,23 @@ export function useKnowledgeBase() {
     }
   });
   
+  // Custom functions that wrap the mutations with callback handling
+  const listPineconeIndexesWithCallback = async (callback?: (indexes: PineconeIndex[]) => void) => {
+    const result = await listPineconeIndexesMutation.mutateAsync();
+    if (callback && result) {
+      callback(result);
+    }
+    return result;
+  };
+  
+  const listPineconeNamespacesWithCallback = async (indexName: string, callback?: (data: any) => void) => {
+    const result = await listPineconeNamespacesMutation.mutateAsync(indexName);
+    if (callback && result) {
+      callback(result);
+    }
+    return result;
+  };
+  
   return {
     // Knowledge base operations
     knowledgeBases,
@@ -367,8 +380,8 @@ export function useKnowledgeBase() {
     isSearching: vectorSearchMutation.isPending,
     searchResults: vectorSearchMutation.data,
     
-    // Pinecone operations
-    listPineconeIndexes: listPineconeIndexesMutation.mutate,
+    // Pinecone operations - use our callback wrappers
+    listPineconeIndexes: listPineconeIndexesWithCallback,
     isListingPineconeIndexes: listPineconeIndexesMutation.isPending,
     createPineconeIndex: createPineconeIndexMutation.mutate,
     isCreatingPineconeIndex: createPineconeIndexMutation.isPending,
@@ -376,7 +389,7 @@ export function useKnowledgeBase() {
     isDeletingPineconeIndex: deletePineconeIndexMutation.isPending,
     describePineconeIndex: describePineconeIndexMutation.mutate,
     isDescribingPineconeIndex: describePineconeIndexMutation.isPending,
-    listPineconeNamespaces: listPineconeNamespacesMutation.mutate,
+    listPineconeNamespaces: listPineconeNamespacesWithCallback,
     isListingPineconeNamespaces: listPineconeNamespacesMutation.isPending,
     getPineconeStats: getPineconeStatsMutation.mutate,
     isGettingPineconeStats: getPineconeStatsMutation.isPending,

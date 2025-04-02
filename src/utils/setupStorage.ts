@@ -35,7 +35,7 @@ export async function ensureStorageIsSetup() {
     }
     
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error setting up storage:', error);
     toast({
       title: 'Storage Setup Error',
@@ -81,7 +81,7 @@ export async function reprocessPendingDocuments(knowledgeBaseId?: string) {
     }
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error reprocessing documents:', error);
     toast({
       title: 'Processing Error',

@@ -59,7 +59,7 @@ export async function createKnowledgeBase(name: string, type: KnowledgeBaseType,
 export async function updateKnowledgeBase(id: string, updates: Partial<KnowledgeBase>) {
   try {
     // Make a copy of updates to avoid modifying the original object
-    const updateData = { ...updates };
+    const updateData = { ...updates } as Record<string, any>;
     
     // If config is being updated, merge it with existing config rather than replacing
     if (updateData.config) {
@@ -72,10 +72,12 @@ export async function updateKnowledgeBase(id: string, updates: Partial<Knowledge
       if (fetchError) throw fetchError;
       
       // Merge the configs
-      updateData.config = {
-        ...existingKB.config,
-        ...updateData.config
-      };
+      if (existingKB && existingKB.config) {
+        updateData.config = {
+          ...(existingKB.config as Record<string, any>),
+          ...(updateData.config as Record<string, any>)
+        };
+      }
     }
     
     const { data, error } = await supabase
@@ -205,7 +207,7 @@ export async function uploadDocument(knowledgeBaseId: string, file: File) {
         .update({ 
           status: 'failed',
           metadata: {
-            ...documentData[0].metadata,
+            ...((documentData[0].metadata || {}) as Record<string, any>),
             processingError: processError.message
           }
         })
@@ -322,11 +324,11 @@ export async function listPineconeIndexes(): Promise<PineconeIndex[]> {
     }
     
     if (Array.isArray(data)) {
-      return data;
+      return data as PineconeIndex[];
     }
     
     if (data.indexes && Array.isArray(data.indexes)) {
-      return data.indexes;
+      return data.indexes as PineconeIndex[];
     }
     
     console.error("Unexpected response format from pinecone-operations:", data);

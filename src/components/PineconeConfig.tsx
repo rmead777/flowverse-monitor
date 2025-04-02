@@ -74,10 +74,15 @@ const PineconeConfig: React.FC<PineconeConfigProps> = ({ knowledgeBase, onUpdate
           
           // If we have a current index in the config but it's not in the list, add it
           if (knowledgeBase.config?.pineconeIndex && !indexes.some(idx => idx.name === knowledgeBase.config.pineconeIndex)) {
-            setAvailableIndexes(prev => [...prev, { 
+            // Create a full compliant PineconeIndex object
+            const defaultIndex: PineconeIndex = { 
               name: knowledgeBase.config.pineconeIndex,
-              status: 'unknown'
-            }]);
+              status: 'unknown',
+              dimension: 1536, // Default dimension for OpenAI embeddings
+              metric: 'cosine' // Default metric
+            };
+            
+            setAvailableIndexes(prev => [...prev, defaultIndex]);
           }
           
           console.log("Available indexes:", indexes);

@@ -24,6 +24,7 @@ serve(async (req) => {
     
     // Validate env variables
     if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing environment variables');
       throw new Error('Missing environment variables');
     }
 
@@ -31,8 +32,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse request body
-    const { knowledgeBaseId } = await req.json();
-    console.log(`Looking for pending documents${knowledgeBaseId ? ` in knowledge base: ${knowledgeBaseId}` : ''}`);
+    let knowledgeBaseId;
+    try {
+      const body = await req.json();
+      knowledgeBaseId = body.knowledgeBaseId;
+      console.log(`Looking for pending documents${knowledgeBaseId ? ` in knowledge base: ${knowledgeBaseId}` : ''}`);
+    } catch (e) {
+      console.log("No request body or invalid JSON, proceeding without knowledge base filter");
+    }
 
     // Find documents with 'pending', 'failed', or 'processing' status
     // We include 'processing' to handle cases where the process might have been interrupted
@@ -110,7 +117,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('General error in reprocess-documents function:', error);
     
     return new Response(
