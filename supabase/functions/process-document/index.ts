@@ -40,8 +40,19 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   
   try {
-    const { documentId } = await req.json();
-    console.log(`Processing document with ID: ${documentId}`);
+    // Parse request body
+    let documentId;
+    try {
+      const requestData = await req.json();
+      documentId = requestData.documentId;
+      console.log(`Processing document with ID: ${documentId}`);
+    } catch (parseError) {
+      console.error('Error parsing request JSON:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request format - expected JSON with documentId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!documentId) {
       console.error('No document ID provided');
@@ -193,25 +204,54 @@ async function updateDocumentStatus(supabase, documentId, status) {
 }
 
 async function extractTextFromPdf(fileData) {
-  const typedArray = new Uint8Array(await fileData.arrayBuffer());
-  
-  // Loading the PDF document using pdfjs
-  const pdf = await pdfjs.getDocument({ data: typedArray }).promise;
-  let text = '';
-  
-  // Extracting text from each page
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items.map(item => item.str).join(' ');
-    text += pageText + ' ';
+  try {
+    const typedArray = new Uint8Array(await fileData.arrayBuffer());
+    
+    // Force setting global.window to prevent PDF.js worker errors
+    if (typeof globalThis.window === 'undefined') {
+      // @ts-ignore
+      globalThis.window = { pdfjsWorker: {} };
+    }
+    
+    // Loading the PDF document using pdfjs
+    const loadingTask = pdfjs.getDocument({ data: typedArray });
+    const pdf = await loadingTask.promise;
+    let text = '';
+    
+    // Extracting text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      try {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        text += pageText + ' ';
+        console.log(`Extracted text from page ${i} of ${pdf.numPages}`);
+      } catch (pageError) {
+        console.error(`Error extracting text from page ${i}:`, pageError);
+        // Continue with next page instead of failing the entire process
+      }
+    }
+    
+    return text.trim();
+  } catch (error) {
+    console.error('Error in PDF extraction:', error);
+    throw new Error(`PDF extraction failed: ${error.message}`);
   }
-  
-  return text.trim();
 }
 
 function splitIntoChunks(text, maxChunkSize = 1000, overlap = 100) {
+  if (!text || text.length === 0) {
+    console.warn('Empty text provided for chunking');
+    return [""];
+  }
+  
   const words = text.split(/\s+/);
+  
+  if (words.length === 0) {
+    console.warn('No words found in text for chunking');
+    return [""];
+  }
+  
   const chunks = [];
   
   for (let i = 0; i < words.length; i += maxChunkSize - overlap) {
@@ -223,23 +263,34 @@ function splitIntoChunks(text, maxChunkSize = 1000, overlap = 100) {
 }
 
 async function createEmbedding(text, apiKey) {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      input: text,
-      model: 'text-embedding-ada-002'
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+  if (!text || text.trim().length === 0) {
+    console.warn('Empty text provided for embedding');
+    // Return a zero vector of the correct dimension for the model instead of throwing
+    return new Array(1536).fill(0);
   }
+  
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        input: text.slice(0, 8000), // Limit input to avoid token limits
+        model: 'text-embedding-ada-002'
+      })
+    });
 
-  const data = await response.json();
-  return data.data[0].embedding;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.data[0].embedding;
+  } catch (error) {
+    console.error('Error creating embedding:', error);
+    throw error;
+  }
 }

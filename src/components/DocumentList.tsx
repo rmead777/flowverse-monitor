@@ -235,17 +235,26 @@ const DocumentList = ({
     }
   };
 
-  const handleReprocessAllDocuments = async () => {
+  const retryFailedDocuments = async () => {
     if (!knowledgeBaseId) return;
     
     try {
+      const failedDocs = documents.filter(doc => doc.status === 'failed');
+      if (failedDocs.length === 0) {
+        toast({
+          title: 'No Failed Documents',
+          description: 'There are no failed documents to retry'
+        });
+        return;
+      }
+      
       setIsReprocessingAll(true);
       
       const result = await reprocessPendingDocuments(knowledgeBaseId);
       
       if (result && result.processed > 0) {
         toast({
-          title: 'Documents Processing Started',
+          title: 'Retrying Failed Documents',
           description: `${result.processed} documents are being reprocessed`,
         });
         
@@ -257,15 +266,15 @@ const DocumentList = ({
       } else {
         toast({
           title: 'No Documents to Process',
-          description: 'There are no pending documents to reprocess',
+          description: 'There are no failed documents to reprocess',
         });
       }
       
     } catch (error) {
-      console.error('Error reprocessing documents:', error);
+      console.error('Error retrying failed documents:', error);
       toast({
         title: 'Processing Error',
-        description: 'There was an error reprocessing the documents',
+        description: 'There was an error retrying the failed documents',
         variant: 'destructive'
       });
     } finally {
@@ -325,6 +334,21 @@ const DocumentList = ({
                 <RefreshCw className="h-4 w-4" />
               )}
               <span>Reprocess {pendingCount} Document{pendingCount !== 1 ? 's' : ''}</span>
+            </Button>
+          )}
+          {knowledgeBaseId && documents.filter(doc => doc.status === 'failed').length > 0 && (
+            <Button 
+              onClick={retryFailedDocuments}
+              variant="outline"
+              className="flex items-center gap-2 border-red-700 text-red-500 hover:bg-red-900/20"
+              disabled={isReprocessingAll}
+            >
+              {isReprocessingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span>Retry {documents.filter(doc => doc.status === 'failed').length} Failed Document{documents.filter(doc => doc.status === 'failed').length !== 1 ? 's' : ''}</span>
             </Button>
           )}
           <Button 

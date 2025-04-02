@@ -60,3 +60,13 @@ sender_name = "Supabase"
 [functions]
 # Replace the boolean value with a map as expected
 serve_local = { allowed_http_hosts = ["*"] }
+
+# Enable debugging for edge functions
+[functions.process-document]
+verify_jwt = false
+
+[functions.reprocess-documents]
+verify_jwt = false
+
+[functions.setup-storage] 
+verify_jwt = false

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import PineconeConfig from '@/components/PineconeConfig';
 
 const KnowledgeBaseView = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [showAddKbDialog, setShowAddKbDialog] = useState(false);
   const [showKbDetailsDialog, setShowKbDetailsDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -25,6 +26,7 @@ const KnowledgeBaseView = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('general');
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [newKbData, setNewKbData] = useState({
     name: '',
@@ -45,6 +47,7 @@ const KnowledgeBaseView = () => {
   const { 
     knowledgeBases, 
     isLoadingKnowledgeBases,
+    refetchKnowledgeBases,
     createKnowledgeBase,
     isCreatingKnowledgeBase,
     updateKnowledgeBase,
@@ -56,10 +59,18 @@ const KnowledgeBaseView = () => {
     isSavingApiKey
   } = useKnowledgeBase();
   
-  const { data: selectedKbDocuments, isLoading: isLoadingDocuments } = 
+  const { data: selectedKbDocuments, isLoading: isLoadingDocuments, refetch: refetchDocuments } = 
     useKnowledgeBase().getDocuments(selectedKnowledgeBase?.id || '');
 
-  const { toast } = useToast();
+  const resetState = useCallback(() => {
+    setSelectedKnowledgeBase(null);
+    setShowDeleteDialog(false);
+    setShowKbDetailsDialog(false);
+    setIsDeleting(false);
+    setTimeout(() => {
+      refetchKnowledgeBases();
+    }, 500);
+  }, [refetchKnowledgeBases]);
 
   const handleAddKnowledgeBase = () => {
     const config: Record<string, any> = {};
@@ -137,11 +148,25 @@ const KnowledgeBaseView = () => {
     setApiKeyDialog(false);
   };
   
-  const handleDeleteKnowledgeBase = () => {
+  const handleDeleteKnowledgeBase = async () => {
     if (selectedKnowledgeBase) {
-      deleteKnowledgeBase(selectedKnowledgeBase.id);
-      setShowDeleteDialog(false);
-      setShowKbDetailsDialog(false);
+      try {
+        setIsDeleting(true);
+        await deleteKnowledgeBase(selectedKnowledgeBase.id);
+        resetState();
+        toast({
+          title: 'Knowledge Base Deleted',
+          description: 'Knowledge Base has been successfully deleted'
+        });
+      } catch (error) {
+        console.error('Error deleting knowledge base:', error);
+        setIsDeleting(false);
+        toast({
+          title: 'Deletion Error',
+          description: 'There was an error deleting the knowledge base',
+          variant: 'destructive'
+        });
+      }
     }
   };
   
@@ -286,6 +311,17 @@ const KnowledgeBaseView = () => {
         return null;
     }
   };
+
+  useEffect(() => {
+    return () => {
+      setShowAddKbDialog(false);
+      setShowKbDetailsDialog(false);
+      setShowDeleteDialog(false);
+      setApiKeyDialog(false);
+      setUploadDialogOpen(false);
+      setSelectedKnowledgeBase(null);
+    };
+  }, []);
 
   return (
     <div className="container mx-auto">
@@ -434,7 +470,14 @@ const KnowledgeBaseView = () => {
       </Dialog>
 
       {selectedKnowledgeBase && (
-        <Dialog open={showKbDetailsDialog} onOpenChange={setShowKbDetailsDialog}>
+        <Dialog 
+          open={showKbDetailsDialog} 
+          onOpenChange={(open) => {
+            if (!isDeleting || !open) {
+              setShowKbDetailsDialog(open);
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[750px] bg-gray-900 border-gray-800 text-white">
             <DialogHeader>
               <div className="flex justify-between items-center">
@@ -619,7 +662,14 @@ const KnowledgeBaseView = () => {
         </Dialog>
       )}
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog 
+        open={showDeleteDialog} 
+        onOpenChange={(open) => {
+          if (!isDeleting || !open) {
+            setShowDeleteDialog(open);
+          }
+        }}
+      >
         <AlertDialogContent className="bg-gray-900 border-gray-800 text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -631,13 +681,18 @@ const KnowledgeBaseView = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-gray-700 text-gray-300">Cancel</AlertDialogCancel>
+            <AlertDialogCancel 
+              className="border-gray-700 text-gray-300"
+              disabled={isDeleting}
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleDeleteKnowledgeBase}
-              disabled={isDeletingKnowledgeBase}
+              disabled={isDeleting || isDeletingKnowledgeBase}
             >
-              {isDeletingKnowledgeBase ? 
+              {isDeleting || isDeletingKnowledgeBase ? 
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> :
                 'Delete'
               }

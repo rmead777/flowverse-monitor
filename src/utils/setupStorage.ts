@@ -45,9 +45,7 @@ export async function reprocessPendingDocuments(knowledgeBaseId?: string) {
   try {
     console.log('Reprocessing pending documents for knowledge base:', knowledgeBaseId);
     
-    // Removing the call to listFunctions() since it doesn't exist
-    // Instead, we'll just invoke the function directly
-    
+    // Directly invoke the reprocess-documents function
     const { data, error } = await supabase.functions.invoke('reprocess-documents', {
       body: { knowledgeBaseId }
     });
