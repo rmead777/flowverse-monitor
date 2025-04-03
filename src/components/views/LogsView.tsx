@@ -20,6 +20,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Json } from "@/integrations/supabase/types";
 
 const eventTypeColors = {
   info: 'bg-blue-900 text-blue-300',
@@ -42,25 +43,55 @@ const debugSuggestions = {
   ]
 };
 
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  nodeName: string;
+  nodeId: string;
+  eventType: string;
+  details: string;
+}
+
 const LogsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [eventTypeFilter, setEventTypeFilter] = useState('all');
   const [nodeFilter, setNodeFilter] = useState('all');
   const [showDebugDialog, setShowDebugDialog] = useState(false);
-  const [selectedLog, setSelectedLog] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({ 
     from: subDays(new Date(), 7), 
     to: new Date() 
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [uniqueNodes, setUniqueNodes] = useState([]);
+  const [uniqueNodes, setUniqueNodes] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const pageSize = 10;
+
+  // Helper function to safely extract message from Json details
+  const extractMessage = (details: Json | null): string => {
+    if (!details) return 'No details available';
+    
+    // If details is a string, return it directly
+    if (typeof details === 'string') return details;
+    
+    // If details is an object and has a message property
+    if (typeof details === 'object' && details !== null) {
+      const detailsObj = details as Record<string, unknown>;
+      if ('message' in detailsObj && typeof detailsObj.message === 'string') {
+        return detailsObj.message;
+      }
+      // Return JSON stringified version as fallback
+      return JSON.stringify(details);
+    }
+    
+    // Fallback for other types
+    return String(details);
+  };
 
   // Fetch logs from Supabase
   const fetchLogs = async () => {
@@ -110,26 +141,29 @@ const LogsView = () => {
         nodeName: log.agent_name,
         nodeId: log.id.slice(0, 8), // Use first 8 chars of ID as node ID
         eventType: log.event_type,
-        details: log.details?.message || JSON.stringify(log.details)
+        details: extractMessage(log.details)
       }));
 
       setLogs(formattedLogs);
       setTotalPages(Math.ceil((count || 0) / pageSize));
 
-      // Extract unique nodes for filter
-      const { data: nodesData } = await supabase
+      // Fetch unique nodes for filter
+      const nodesQuery = await supabase
         .from('agent_logs')
-        .select('agent_name')
-        .distinct();
-
-      if (nodesData) {
-        setUniqueNodes(nodesData.map(item => item.agent_name));
+        .select('agent_name');
+        
+      // Process the results to get unique node names
+      if (nodesQuery.data) {
+        const nodeNames = nodesQuery.data.map(item => item.agent_name);
+        // Filter out duplicates
+        const uniqueNodeNames = [...new Set(nodeNames)];
+        setUniqueNodes(uniqueNodeNames);
       }
     } catch (error) {
       console.error('Error fetching logs:', error);
       toast({
         title: 'Error fetching logs',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -170,22 +204,25 @@ const LogsView = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, eventTypeFilter, nodeFilter, dateRange.from, dateRange.to, currentPage]);
 
-  const handleDebug = (log) => {
+  const handleDebug = (log: LogEntry) => {
     setSelectedLog(log);
     setShowDebugDialog(true);
   };
 
-  const getSuggestions = (details) => {
+  const getSuggestions = (details: string) => {
     for (const key in debugSuggestions) {
       if (details.includes(key)) {
-        return debugSuggestions[key];
+        return debugSuggestions[key as keyof typeof debugSuggestions];
       }
     }
     return ['No specific suggestions available for this error.'];
   };
 
-  const handleDateRangeSelect = (range) => {
-    setDateRange(range);
+  const handleDateRangeSelect = (range: { from: Date | undefined; to: Date | undefined }) => {
+    setDateRange({
+      from: range.from || subDays(new Date(), 7),
+      to: range.to || new Date()
+    });
     if (range.from && range.to) {
       setShowDatePicker(false);
     }
@@ -250,7 +287,7 @@ const LogsView = () => {
       console.error('Error exporting logs:', error);
       toast({
         title: 'Error exporting logs',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -292,7 +329,7 @@ const LogsView = () => {
           </span>
         </td>
         <td className="p-2">
-          <span className={`inline-block px-2 py-1 rounded-full text-xs ${eventTypeColors[log.eventType] || 'bg-gray-700 text-gray-300'}`}>
+          <span className={`inline-block px-2 py-1 rounded-full text-xs ${eventTypeColors[log.eventType as keyof typeof eventTypeColors] || 'bg-gray-700 text-gray-300'}`}>
             {log.eventType}
           </span>
         </td>
