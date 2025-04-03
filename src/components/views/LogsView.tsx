@@ -1,23 +1,25 @@
 
-import { useState } from 'react';
-import { Search, Calendar, AlertCircle, Download, Filter } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { Search, Calendar, AlertCircle, Download, Filter, RefreshCcw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-
-const logs = [
-  { id: '1', timestamp: '2023-07-13 14:23:45', nodeName: 'Retriever', nodeId: 'retriever-1a2b3c', eventType: 'info', details: 'Retrieved 5 documents successfully' },
-  { id: '2', timestamp: '2023-07-13 14:23:46', nodeName: 'Context Manager', nodeId: 'contextManager-4d5e6f', eventType: 'info', details: 'Updated context with 5 new documents' },
-  { id: '3', timestamp: '2023-07-13 14:23:47', nodeName: 'AI Response', nodeId: 'aiResponse-7g8h9i', eventType: 'info', details: 'Generated response in 890ms' },
-  { id: '4', timestamp: '2023-07-13 14:24:01', nodeName: 'Retriever', nodeId: 'retriever-1a2b3c', eventType: 'warning', details: 'Similarity threshold not met for 2 documents' },
-  { id: '5', timestamp: '2023-07-13 14:24:05', nodeName: 'Feedback', nodeId: 'feedback-0j1k2l', eventType: 'info', details: 'Received feedback score: 4/5' },
-  { id: '6', timestamp: '2023-07-13 14:30:22', nodeName: 'API Call', nodeId: 'apiCall-3m4n5o', eventType: 'error', details: 'Connection timeout after 5000ms' },
-  { id: '7', timestamp: '2023-07-13 14:31:15', nodeName: 'API Call', nodeId: 'apiCall-3m4n5o', eventType: 'info', details: 'Retry successful after 1 attempt' },
-  { id: '8', timestamp: '2023-07-13 14:35:02', nodeName: 'System Prompt', nodeId: 'systemPrompt-6p7q8r', eventType: 'info', details: 'Prompt updated by user' },
-  { id: '9', timestamp: '2023-07-13 14:40:18', nodeName: 'AI Response', nodeId: 'aiResponse-7g8h9i', eventType: 'warning', details: 'Response exceeds recommended length' },
-  { id: '10', timestamp: '2023-07-13 14:45:33', nodeName: 'Context Manager', nodeId: 'contextManager-4d5e6f', eventType: 'error', details: 'Failed to store context in Supabase' }
-];
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format, subDays } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const eventTypeColors = {
   info: 'bg-blue-900 text-blue-300',
@@ -46,19 +48,127 @@ const LogsView = () => {
   const [nodeFilter, setNodeFilter] = useState('all');
   const [showDebugDialog, setShowDebugDialog] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
-
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = searchTerm === '' || 
-      log.nodeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesEventType = eventTypeFilter === 'all' || log.eventType === eventTypeFilter;
-    const matchesNode = nodeFilter === 'all' || log.nodeName === nodeFilter;
-    
-    return matchesSearch && matchesEventType && matchesNode;
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({ 
+    from: subDays(new Date(), 7), 
+    to: new Date() 
   });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [uniqueNodes, setUniqueNodes] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
+  const pageSize = 10;
 
-  const uniqueNodes = Array.from(new Set(logs.map(log => log.nodeName)));
+  // Fetch logs from Supabase
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('agent_logs')
+        .select('*', { count: 'exact' })
+        .order('timestamp', { ascending: false });
+
+      // Apply date range filter
+      if (dateRange.from) {
+        query = query.gte('timestamp', format(dateRange.from, 'yyyy-MM-dd'));
+      }
+      if (dateRange.to) {
+        query = query.lte('timestamp', format(dateRange.to, 'yyyy-MM-dd 23:59:59'));
+      }
+
+      // Apply event type filter
+      if (eventTypeFilter !== 'all') {
+        query = query.eq('event_type', eventTypeFilter);
+      }
+
+      // Apply node filter
+      if (nodeFilter !== 'all') {
+        query = query.eq('agent_name', nodeFilter);
+      }
+
+      // Apply search filter
+      if (searchTerm) {
+        query = query.or(`agent_name.ilike.%${searchTerm}%,details->>'message'.ilike.%${searchTerm}%`);
+      }
+
+      // Apply pagination
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      // Transform data to match our expected format
+      const formattedLogs = data.map(log => ({
+        id: log.id,
+        timestamp: format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss'),
+        nodeName: log.agent_name,
+        nodeId: log.id.slice(0, 8), // Use first 8 chars of ID as node ID
+        eventType: log.event_type,
+        details: log.details?.message || JSON.stringify(log.details)
+      }));
+
+      setLogs(formattedLogs);
+      setTotalPages(Math.ceil((count || 0) / pageSize));
+
+      // Extract unique nodes for filter
+      const { data: nodesData } = await supabase
+        .from('agent_logs')
+        .select('agent_name')
+        .distinct();
+
+      if (nodesData) {
+        setUniqueNodes(nodesData.map(item => item.agent_name));
+      }
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+      toast({
+        title: 'Error fetching logs',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchLogs();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('public:agent_logs')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'agent_logs' 
+      }, (payload) => {
+        // When a new log is added, refresh the logs
+        fetchLogs();
+        toast({
+          title: 'New log received',
+          description: `${payload.new.agent_name}: ${payload.new.event_type}`,
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refetch when filters or pagination change
+  useEffect(() => {
+    fetchLogs();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, eventTypeFilter, nodeFilter, dateRange.from, dateRange.to, currentPage]);
 
   const handleDebug = (log) => {
     setSelectedLog(log);
@@ -74,18 +184,181 @@ const LogsView = () => {
     return ['No specific suggestions available for this error.'];
   };
 
+  const handleDateRangeSelect = (range) => {
+    setDateRange(range);
+    if (range.from && range.to) {
+      setShowDatePicker(false);
+    }
+  };
+
+  const exportLogs = async () => {
+    setIsExporting(true);
+    try {
+      // Fetch all logs without pagination for export
+      let query = supabase
+        .from('agent_logs')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      // Apply same filters as the view
+      if (dateRange.from) {
+        query = query.gte('timestamp', format(dateRange.from, 'yyyy-MM-dd'));
+      }
+      if (dateRange.to) {
+        query = query.lte('timestamp', format(dateRange.to, 'yyyy-MM-dd 23:59:59'));
+      }
+      if (eventTypeFilter !== 'all') {
+        query = query.eq('event_type', eventTypeFilter);
+      }
+      if (nodeFilter !== 'all') {
+        query = query.eq('agent_name', nodeFilter);
+      }
+      if (searchTerm) {
+        query = query.or(`agent_name.ilike.%${searchTerm}%,details->>'message'.ilike.%${searchTerm}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Convert to CSV
+      const headers = ['Timestamp', 'Node Name', 'Event Type', 'Details'];
+      const csvContent = [
+        headers.join(','),
+        ...data.map(log => [
+          new Date(log.timestamp).toISOString(),
+          log.agent_name,
+          log.event_type,
+          JSON.stringify(log.details).replace(/,/g, ';') // Avoid CSV commas in JSON
+        ].join(','))
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `flowverse_logs_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: 'Logs exported successfully',
+        description: `${data.length} log entries exported to CSV`,
+      });
+    } catch (error) {
+      console.error('Error exporting logs:', error);
+      toast({
+        title: 'Error exporting logs',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Function to generate the filtered logs for display
+  const getFilteredLogs = () => {
+    if (loading) {
+      return Array(5).fill(0).map((_, index) => (
+        <tr key={`skeleton-${index}`} className="border-b border-gray-700">
+          <td className="p-2"><Skeleton className="h-6 w-32 bg-gray-700" /></td>
+          <td className="p-2"><Skeleton className="h-6 w-40 bg-gray-700" /></td>
+          <td className="p-2"><Skeleton className="h-6 w-20 bg-gray-700" /></td>
+          <td className="p-2"><Skeleton className="h-6 w-full bg-gray-700" /></td>
+          <td className="p-2 text-center"><Skeleton className="h-6 w-20 bg-gray-700 mx-auto" /></td>
+        </tr>
+      ));
+    }
+
+    if (logs.length === 0) {
+      return (
+        <tr className="border-b border-gray-700">
+          <td colSpan={5} className="p-4 text-center text-gray-400">
+            No logs found with the current filters. Try adjusting your search criteria.
+          </td>
+        </tr>
+      );
+    }
+
+    return logs.map((log) => (
+      <tr key={log.id} className="border-b border-gray-700">
+        <td className="p-2 text-gray-400">{log.timestamp}</td>
+        <td className="p-2">
+          <span className="flex items-center gap-1">
+            {log.nodeName}
+            <span className="text-xs text-gray-500">({log.nodeId})</span>
+          </span>
+        </td>
+        <td className="p-2">
+          <span className={`inline-block px-2 py-1 rounded-full text-xs ${eventTypeColors[log.eventType] || 'bg-gray-700 text-gray-300'}`}>
+            {log.eventType}
+          </span>
+        </td>
+        <td className="p-2 truncate max-w-xs">{log.details}</td>
+        <td className="p-2 text-center">
+          {log.eventType === 'error' && (
+            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300" onClick={() => handleDebug(log)}>
+              <AlertCircle className="h-4 w-4" />
+              <span className="ml-1">Debug</span>
+            </Button>
+          )}
+        </td>
+      </tr>
+    ));
+  };
+
   return (
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">System Logs</h1>
         <div className="flex gap-2">
-          <Button variant="outline" className="flex gap-2 items-center border-gray-700">
-            <Calendar className="h-4 w-4" />
-            <span>Date Range</span>
-          </Button>
-          <Button variant="outline" className="flex gap-2 items-center border-gray-700">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
+          <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex gap-2 items-center border-gray-700">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "MMM d, yyyy")
+                    )
+                  ) : (
+                    "Date Range"
+                  )}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-700" align="end">
+              <CalendarComponent
+                mode="range"
+                selected={dateRange}
+                onSelect={handleDateRangeSelect}
+                initialFocus
+                classNames={{
+                  day_selected: "bg-indigo-600 text-white", 
+                  day_range_middle: "bg-indigo-500 text-white",
+                  day_range_end: "bg-indigo-600 text-white"
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button 
+            variant="outline" 
+            className="flex gap-2 items-center border-gray-700" 
+            onClick={exportLogs}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <RefreshCcw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span>{isExporting ? 'Exporting...' : 'Export'}</span>
           </Button>
         </div>
       </div>
@@ -132,9 +405,18 @@ const LogsView = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button className="flex gap-1 items-center bg-gray-700 hover:bg-gray-600">
+            <Button 
+              className="flex gap-1 items-center bg-gray-700 hover:bg-gray-600"
+              onClick={() => {
+                setSearchTerm('');
+                setEventTypeFilter('all');
+                setNodeFilter('all');
+                setDateRange({ from: subDays(new Date(), 7), to: new Date() });
+                setCurrentPage(1);
+              }}
+            >
               <Filter className="h-4 w-4" />
-              <span>Apply Filters</span>
+              <span>Reset Filters</span>
             </Button>
           </div>
         </div>
@@ -153,34 +435,56 @@ const LogsView = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map((log) => (
-                <tr key={log.id} className="border-b border-gray-700">
-                  <td className="p-2 text-gray-400">{log.timestamp}</td>
-                  <td className="p-2">
-                    <span className="flex items-center gap-1">
-                      {log.nodeName}
-                      <span className="text-xs text-gray-500">({log.nodeId})</span>
-                    </span>
-                  </td>
-                  <td className="p-2">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${eventTypeColors[log.eventType] || 'bg-gray-700 text-gray-300'}`}>
-                      {log.eventType}
-                    </span>
-                  </td>
-                  <td className="p-2 truncate max-w-xs">{log.details}</td>
-                  <td className="p-2 text-center">
-                    {log.eventType === 'error' && (
-                      <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300" onClick={() => handleDebug(log)}>
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="ml-1">Debug</span>
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {getFilteredLogs()}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="mt-6">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink 
+                        isActive={currentPage === page}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                {totalPages > 5 && (
+                  <>
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLink onClick={() => setCurrentPage(totalPages)}>
+                        {totalPages}
+                      </PaginationLink>
+                    </PaginationItem>
+                  </>
+                )}
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
       {selectedLog && (

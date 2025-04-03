@@ -73,3 +73,6 @@ verify_jwt = false
 
 [functions.pinecone-operations]
 verify_jwt = false
+
+[functions.enable-realtime]
+verify_jwt = false
